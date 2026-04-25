@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMF Shop — Black Market RP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --teal: #00d4c8; --teal-dark: #00a89e;
+      --bg: #0f1420; --bg2: #161b28; --bg3: #1a1f2e;
+      --text: #e8eaf0; --muted: #8892a4;
+      --green: #4ade80; --red: #f87171; --amber: #fbbf24;
+      --border: rgba(0,212,200,0.2);
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+
+    /* ---- TOPBAR ---- */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px; background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; }
+    .logo-badge { background: var(--teal); color: #000; font-size: 13px; font-weight: 800; padding: 4px 12px; border-radius: 4px; letter-spacing: 0.1em; }
+    .logo-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .nav-btn { font-size: 12px; padding: 6px 14px; border-radius: 4px; border: 1px solid rgba(0,212,200,0.3); background: transparent; color: var(--teal); cursor: pointer; transition: all 0.15s; }
+    .nav-btn:hover { background: rgba(0,212,200,0.1); }
+    .nav-btn.active { background: var(--teal); color: #000; font-weight: 700; border-color: var(--teal); }
+    .nav-btn.discord-btn { background: #5865F2; color: #fff; border-color: #5865F2; }
+    .nav-btn.discord-btn:hover { opacity: 0.85; }
+    .cart-badge { background: var(--red); color: #fff; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
+    .user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .user-avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--teal); }
+    .logout-btn { font-size: 11px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+
+    /* ---- PAGES ---- */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ---- SHOP ---- */
+    .shop-header { padding: 24px; border-bottom: 1px solid var(--border); }
+    .shop-title { font-size: 22px; font-weight: 700; color: var(--teal); }
+    .shop-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; padding: 20px 24px; }
+    .weapon-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.2s, transform 0.15s; }
+    .weapon-card:hover { border-color: var(--teal); transform: translateY(-2px); }
+    .card-top { background: linear-gradient(135deg, #0d1520, #1a2535); padding: 24px; display: flex; align-items: center; justify-content: center; min-height: 110px; position: relative; }
+    .card-emoji { font-size: 48px; }
+    .card-cat { position: absolute; top: 8px; right: 8px; background: rgba(0,212,200,0.15); color: var(--teal); font-size: 10px; padding: 2px 8px; border-radius: 3px; border: 1px solid rgba(0,212,200,0.3); }
+    .card-body { padding: 14px; }
+    .card-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .card-desc { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.4; }
+    .card-price { font-size: 16px; font-weight: 700; color: var(--teal); }
+    .card-base { font-size: 11px; color: var(--muted); text-decoration: line-through; margin-bottom: 10px; }
+    .add-btn { width: 100%; padding: 8px; font-size: 12px; font-weight: 700; border: 1px solid var(--teal); border-radius: 4px; background: transparent; color: var(--teal); cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em; }
+    .add-btn:hover { background: var(--teal); color: #000; }
+
+    /* ---- ORDER ---- */
+    .order-wrap { padding: 24px; max-width: 640px; }
+    .section-title { font-size: 18px; font-weight: 700; color: var(--teal); margin-bottom: 4px; }
+    .section-sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+    .order-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+    .item-emoji { font-size: 22px; min-width: 32px; text-align: center; }
+    .item-info { flex: 1; }
+    .item-name { font-size: 13px; font-weight: 600; }
+    .item-unit { font-size: 11px; color: var(--muted); }
+    .qty-wrap { display: flex; align-items: center; gap: 8px; }
+    .qty-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(0,212,200,0.4); background: transparent; color: var(--teal); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .qty-btn:hover { background: rgba(0,212,200,0.15); }
+    .qty-num { font-size: 13px; font-weight: 700; min-width: 20px; text-align: center; }
+    .item-total { font-size: 13px; font-weight: 700; color: var(--teal); min-width: 110px; text-align: right; }
+    .del-btn { background: transparent; border: none; cursor: pointer; color: var(--muted); font-size: 18px; }
+    .del-btn:hover { color: var(--red); }
+    .total-bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--bg); border: 1px solid var(--teal); border-radius: 8px; margin-bottom: 20px; }
+    .total-amount { font-size: 18px; font-weight: 800; color: var(--teal); }
+    .form-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+    .form-box-title { font-size: 12px; font-weight: 700; color: var(--teal); letter-spacing: 0.1em; margin-bottom: 14px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .field input { width: 100%; padding: 9px 12px; background: var(--bg2); border: 1px solid rgba(0,212,200,0.25); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; }
+    .field input:focus { border-color: var(--teal); }
+    .field input::placeholder { color: var(--muted); }
+    .field.full { grid-column: 1 / -1; }
+    .cgu-wrap { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: rgba(0,212,200,0.05); border: 1px solid rgba(0,212,200,0.15); border-radius: 6px; margin-top: 12px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .cgu-wrap input { accent-color: var(--teal); margin-top: 2px; flex-shrink: 0; }
+    .submit-btn { width: 100%; padding: 14px; background: var(--teal); color: #000; font-size: 14px; font-weight: 800; border: none; border-radius: 8px; cursor: pointer; letter-spacing: 0.06em; transition: opacity 0.15s; }
+    .submit-btn:hover { opacity: 0.85; }
+    .empty-cart { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+
+    /* ---- SUCCESS ---- */
+    .success-wrap { padding: 40px 24px; max-width: 540px; margin: 0 auto; text-align: center; }
+    .success-icon { font-size: 52px; margin-bottom: 12px; }
+    .success-title { font-size: 20px; font-weight: 700; color: var(--teal); margin-bottom: 8px; }
+    .success-msg { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+    .ticket-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: left; margin-bottom: 20px; }
+    .ticket-header { font-size: 11px; font-weight: 700; color: var(--teal); letter-spacing: 0.15em; margin-bottom: 12px; }
+    .ticket-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    .ticket-row:last-child { border-bottom: none; }
+    .ticket-label { color: var(--muted); }
+    .ticket-total { color: var(--teal); font-weight: 800; font-size: 15px; }
+    .slots-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; text-align: left; }
+    .slot-label { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; transition: border-color 0.15s; }
+    .slot-label:hover { border-color: var(--teal); }
+    .slot-label input { accent-color: var(--teal); }
+
+    /* ---- ADMIN ---- */
+    .admin-wrap { padding: 24px; }
+    .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { padding: 7px 16px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(0,212,200,0.3); background: transparent; color: var(--muted); cursor: pointer; }
+    .tab-btn.active { background: rgba(0,212,200,0.1); color: var(--teal); border-color: var(--teal); font-weight: 700; }
+    .add-form { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+    .add-form-title { font-size: 12px; font-weight: 700; color: var(--teal); letter-spacing: 0.1em; margin-bottom: 14px; }
+    .add-form .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .add-form input, .add-form select, .add-form textarea { width: 100%; padding: 8px 10px; background: var(--bg2); border: 1px solid rgba(0,212,200,0.25); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; }
+    .add-form textarea { resize: vertical; min-height: 56px; font-family: inherit; }
+    .btn-confirm { margin-top: 12px; padding: 9px 18px; font-size: 13px; font-weight: 700; background: var(--teal); color: #000; border: none; border-radius: 6px; cursor: pointer; }
+    .admin-weapon-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+    .aw-emoji { font-size: 24px; min-width: 32px; }
+    .aw-info { flex: 1; }
+    .aw-name { font-size: 13px; font-weight: 700; }
+    .aw-meta { font-size: 11px; color: var(--muted); }
+    .aw-price { font-size: 13px; font-weight: 700; color: var(--teal); }
+    .aw-del { background: transparent; border: 1px solid rgba(241,75,74,0.4); color: var(--red); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+    .order-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+    .oca-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+    .oca-pseudo { font-size: 14px; font-weight: 700; }
+    .oca-gang { font-size: 12px; color: var(--muted); }
+    .status-badge { font-size: 11px; padding: 3px 10px; border-radius: 3px; font-weight: 700; }
+    .badge-pending { background: rgba(251,191,36,0.15); color: var(--amber); border: 1px solid rgba(251,191,36,0.3); }
+    .badge-done { background: rgba(74,222,128,0.15); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+    .oca-items { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .oca-total { font-size: 14px; font-weight: 800; color: var(--teal); margin-bottom: 10px; }
+    .oca-actions { display: flex; gap: 8px; }
+    .btn-terminate { padding: 7px 14px; font-size: 12px; font-weight: 700; background: var(--teal); color: #000; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-delete { padding: 7px 14px; font-size: 12px; background: transparent; color: var(--red); border: 1px solid rgba(241,75,74,0.4); border-radius: 4px; cursor: pointer; }
+
+    /* ---- ACCESS DENIED ---- */
+    .denied-wrap { text-align: center; padding: 60px 24px; }
+    .denied-icon { font-size: 52px; margin-bottom: 12px; }
+    .denied-title { font-size: 20px; font-weight: 700; color: var(--red); margin-bottom: 8px; }
+    .denied-sub { font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo-wrap">
+    <div class="logo-badge">BMF</div>
+    <div class="logo-sub">Black Market · RP</div>
+  </div>
+  <div class="nav-right">
+    <button class="nav-btn active" onclick="showPage('shop')">Catalogue</button>
+    <button class="nav-btn" onclick="showPage('order')">
+      Commande <span id="cart-badge" class="cart-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" onclick="goAdmin()">Admin</button>
+    <div id="auth-area"></div>
+  </div>
+</div>
+
+<!-- PAGE SHOP -->
+<div id="page-shop" class="page active">
+  <div class="shop-header">
+    <div class="shop-title">Armurerie BMF</div>
+    <div class="shop-sub">Paiement en argent sale · Livraison sécurisée · Organisation BMF</div>
+  </div>
+  <div class="catalog" id="catalog"></div>
+</div>
+
+<!-- PAGE ORDER -->
+<div id="page-order" class="page">
+  <div class="order-wrap">
+    <div class="section-title">Votre commande</div>
+    <div class="section-sub">Vérifiez vos articles puis remplissez vos infos RP</div>
+    <div id="order-items"></div>
+    <div id="form-area" style="display:none">
+      <div class="form-box">
+        <div class="form-box-title">INFORMATIONS RP</div>
+        <div class="form-grid">
+          <div class="field"><label>Pseudo illégal</label><input type="text" id="f-pseudo" placeholder="Tony Montana"></div>
+          <div class="field"><label>Groupe illégal</label><input type="text" id="f-gang" placeholder="Los Santos Cartel"></div>
+          <div class="field full"><label>Numéro de téléphone RP</label><input type="text" id="f-phone" placeholder="555-0147"></div>
+        </div>
+        <div class="cgu-wrap">
+          <input type="checkbox" id="f-cgu">
+          <label for="f-cgu">Je reconnais que cette transaction se déroule dans le cadre fictif du serveur FiveM BMF RP. La commande est définitive une fois validée. Toute tentative de fraude sera sanctionnée.</label>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="submitOrder()">⚔ CONFIRMER ET ENVOYER SUR DISCORD</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE SUCCESS -->
+<div id="page-success" class="page">
+  <div class="success-wrap">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Commande envoyée !</div>
+    <div class="success-msg">Un ticket a été créé sur le Discord BMF. Sélectionnez vos créneaux de livraison disponibles.</div>
+    <div class="ticket-box">
+      <div class="ticket-header">TICKET DISCORD · BMF</div>
+      <div id="ticket-content"></div>
+    </div>
+    <div class="slots-title">Choisissez jusqu'à 3 créneaux de livraison</div>
+    <div id="date-slots"></div>
+    <button class="submit-btn" style="margin-top:12px" onclick="confirmSlots()">Confirmer les créneaux</button>
+  </div>
+</div>
+
+<!-- PAGE ADMIN -->
+<div id="page-admin" class="page">
+  <div class="admin-wrap">
+    <div class="section-title">Panel Admin · BMF</div>
+    <div class="section-sub" id="admin-user-label">Connecté en tant qu'administrateur</div>
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchTab('weapons')">Armes</button>
+      <button class="tab-btn" onclick="switchTab('orders')">Commandes</button>
+    </div>
+    <div id="tab-weapons">
+      <div class="add-form">
+        <div class="add-form-title">AJOUTER UNE ARME</div>
+        <div class="form-grid">
+          <div class="field"><label>Nom</label><input type="text" id="a-name" placeholder="Nom de l'arme"></div>
+          <div class="field"><label>Catégorie</label>
+            <select id="a-cat"><option>Pistolet</option><option>Fusil</option><option>Sniper</option><option>Explosif</option><option>Autre</option></select>
+          </div>
+          <div class="field"><label>Prix argent sale (€)</label><input type="number" id="a-price" placeholder="1200000"></div>
+          <div class="field"><label>Emoji</label><input type="text" id="a-emoji" placeholder="🔫"></div>
+          <div class="field full"><label>Description</label><textarea id="a-desc" placeholder="Description courte"></textarea></div>
+        </div>
+        <button class="btn-confirm" onclick="addWeapon()">Ajouter au catalogue</button>
+      </div>
+      <div id="admin-weapon-list"></div>
+    </div>
+    <div id="tab-orders" style="display:none">
+      <div id="admin-orders-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE DENIED -->
+<div id="page-denied" class="page">
+  <div class="denied-wrap">
+    <div class="denied-icon">🚫</div>
+    <div class="denied-title">Accès refusé</div>
+    <div class="denied-sub">Vous n'êtes pas autorisé à accéder au panel admin BMF.<br>Connectez-vous avec le compte Discord administrateur.</div>
+  </div>
+</div>
+
+<script>
+  const MARKUP = 500000;
+  let weapons = [
+    { id:1, name:'Machine Pistol', cat:'Pistolet', price:1200000, emoji:'🔫', desc:'Une arme automatique compacte mais puissante.' },
+    { id:2, name:'Fusil à canon scié', cat:'Fusil', price:2000000, emoji:'🪓', desc:'Un fusil brutal pour les combats à très courte portée.' },
+    { id:3, name:'AK-47', cat:'Fusil', price:2250000, emoji:'⚔️', desc:'Fusil d\'assaut lourd et redoutable.' },
+    { id:4, name:'AK-U', cat:'Fusil', price:2500000, emoji:'🔧', desc:'Version compacte d\'un fusil d\'assaut.' },
+  ];
+  let cart = {};
+  let orders = [];
+  let currentUser = null;
+  let isAdmin = false;
+
+  function fmt(n) { return n.toLocaleString('fr-FR') + '€'; }
+  function totalPrice(w) { return w.price + MARKUP; }
+
+  // ---- AUTH ----
+  async function loadUser() {
+    try {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      currentUser = data.user;
+      isAdmin = data.isAdmin;
+      renderAuth();
+    } catch(e) { renderAuth(); }
+  }
+
+  function renderAuth() {
+    const area = document.getElementById('auth-area');
+    if (currentUser) {
+      const avatarUrl = currentUser.avatar
+        ? `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`
+        : 'https://cdn.discordapp.com/embed/avatars/0.png';
+      area.innerHTML = `
+        <div class="user-info">
+          <img class="user-avatar" src="${avatarUrl}" alt="avatar">
+          <span style="font-size:13px;font-weight:600">${currentUser.username}</span>
+          <a class="logout-btn" href="/auth/logout">Déconnexion</a>
+        </div>`;
+    } else {
+      area.innerHTML = `<a href="/auth/discord"><button class="nav-btn discord-btn">🎮 Connexion Discord</button></a>`;
+    }
+  }
+
+  // ---- PAGES ----
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const map = { shop:0, order:1, admin:2 };
+    if (map[name] !== undefined) document.querySelectorAll('.nav-btn')[map[name]].classList.add('active');
+    if (name === 'order') renderOrderPage();
+    if (name === 'admin') { renderAdminWeapons(); }
+  }
+
+  function goAdmin() {
+    if (!currentUser) { alert('Connectez-vous avec Discord pour accéder au panel admin.'); return; }
+    if (!isAdmin) { showPage('denied'); return; }
+    showPage('admin');
+  }
+
+  // ---- CATALOGUE ----
+  function renderCatalog() {
+    document.getElementById('catalog').innerHTML = weapons.map(w => `
+      <div class="weapon-card">
+        <div class="card-top">
+          <div class="card-emoji">${w.emoji}</div>
+          <div class="card-cat">${w.cat.toUpperCase()}</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">${w.name}</div>
+          <div class="card-desc">${w.desc}</div>
+          <div class="card-price">${fmt(totalPrice(w))}</div>
+          <div class="card-base">Prix de base : ${fmt(w.price)}</div>
+          <button class="add-btn" onclick="addToCart(${w.id})">+ Ajouter à la commande</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function addToCart(id) {
+    cart[id] = (cart[id] || 0) + 1;
+    updateBadge();
+  }
+  function updateBadge() {
+    const n = Object.values(cart).reduce((a,b) => a+b, 0);
+    const b = document.getElementById('cart-badge');
+    b.textContent = n; b.style.display = n > 0 ? 'inline-flex' : 'none';
+  }
+
+  // ---- COMMANDE ----
+  function renderOrderPage() {
+    const el = document.getElementById('order-items');
+    const fa = document.getElementById('form-area');
+    const keys = Object.keys(cart).filter(k => cart[k] > 0);
+    if (!keys.length) {
+      el.innerHTML = '<div class="empty-cart">Votre panier est vide.<br>Ajoutez des armes depuis le catalogue.</div>';
+      fa.style.display = 'none'; return;
+    }
+    let total = 0;
+    el.innerHTML = keys.map(k => {
+      const w = weapons.find(x => x.id == k);
+      const sub = totalPrice(w) * cart[k]; total += sub;
+      return `<div class="order-item">
+        <div class="item-emoji">${w.emoji}</div>
+        <div class="item-info"><div class="item-name">${w.name}</div><div class="item-unit">${fmt(totalPrice(w))} / unité</div></div>
+        <div class="qty-wrap">
+          <button class="qty-btn" onclick="chgQty(${k},-1)">−</button>
+          <span class="qty-num">${cart[k]}</span>
+          <button class="qty-btn" onclick="chgQty(${k},1)">+</button>
+        </div>
+        <div class="item-total">${fmt(sub)}</div>
+        <button class="del-btn" onclick="rmItem(${k})">✕</button>
+      </div>`;
+    }).join('') + `<div class="total-bar"><span style="font-size:13px;color:var(--muted)">Total argent sale</span><span class="total-amount">${fmt(total)}</span></div>`;
+    fa.style.display = 'block';
+  }
+
+  function chgQty(id, d) { cart[id] = Math.max(0, (cart[id]||0)+d); if (!cart[id]) delete cart[id]; updateBadge(); renderOrderPage(); }
+  function rmItem(id) { delete cart[id]; updateBadge(); renderOrderPage(); }
+
+  async function submitOrder() {
+    const pseudo = document.getElementById('f-pseudo').value.trim();
+    const gang = document.getElementById('f-gang').value.trim();
+    const phone = document.getElementById('f-phone').value.trim();
+    const cgu = document.getElementById('f-cgu').checked;
+    if (!pseudo || !gang || !phone) { alert('Remplis tous les champs RP.'); return; }
+    if (!cgu) { alert('Tu dois accepter les conditions BMF.'); return; }
+    const keys = Object.keys(cart).filter(k => cart[k] > 0);
+    if (!keys.length) { alert('Panier vide.'); return; }
+    let total = 0;
+    const items = keys.map(k => { const w = weapons.find(x => x.id==k); const sub = totalPrice(w)*cart[k]; total+=sub; return {name:w.name, qty:cart[k], sub}; });
+
+    try {
+      const res = await fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pseudo, gang, phone, items, total })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error();
+      const order = { id: Date.now(), pseudo, gang, phone, items, total, status:'pending' };
+      orders.push(order);
+      showSuccess(order);
+      cart = {}; updateBadge();
+    } catch(e) { alert('Erreur lors de l\'envoi. Vérifiez la connexion.'); }
+  }
+
+  function showSuccess(o) {
+    document.getElementById('ticket-content').innerHTML = `
+      <div class="ticket-row"><span class="ticket-label">Pseudo illégal</span><span>${o.pseudo}</span></div>
+      <div class="ticket-row"><span class="ticket-label">Groupe</span><span>${o.gang}</span></div>
+      <div class="ticket-row"><span class="ticket-label">Téléphone</span><span>${o.phone}</span></div>
+      <div class="ticket-row"><span class="ticket-label">Articles</span><span>${o.items.map(i=>i.name+' x'+i.qty).join(', ')}</span></div>
+      <div class="ticket-row"><span class="ticket-label">Total</span><span class="ticket-total">${fmt(o.total)}</span></div>`;
+    const now = new Date();
+    const sl = document.getElementById('date-slots');
+    sl.innerHTML = '';
+    for (let i=1; i<=5; i++) {
+      const d = new Date(now); d.setDate(now.getDate()+i);
+      const lab = d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
+      sl.innerHTML += `<label class="slot-label"><input type="checkbox" class="slot-chk" value="${lab}"> ${lab}</label>`;
+    }
+    showPage('success');
+  }
+
+  function confirmSlots() {
+    const chks = document.querySelectorAll('.slot-chk:checked');
+    if (!chks.length) { alert('Sélectionne au moins un créneau.'); return; }
+    alert('Créneaux confirmés !\nLe staff BMF vous contactera sur Discord.');
+    showPage('shop');
+  }
+
+  // ---- ADMIN ----
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (tab==='weapons'&&i===0)||(tab==='orders'&&i===1)));
+    document.getElementById('tab-weapons').style.display = tab==='weapons' ? 'block' : 'none';
+    document.getElementById('tab-orders').style.display = tab==='orders' ? 'block' : 'none';
+    if (tab==='orders') renderAdminOrders();
+    if (tab==='weapons') renderAdminWeapons();
+  }
+
+  function renderAdminWeapons() {
+    document.getElementById('admin-weapon-list').innerHTML = weapons.map(w => `
+      <div class="admin-weapon-row">
+        <div class="aw-emoji">${w.emoji}</div>
+        <div class="aw-info"><div class="aw-name">${w.name}</div><div class="aw-meta">${w.cat} · Base: ${fmt(w.price)}</div></div>
+        <div class="aw-price">${fmt(totalPrice(w))}</div>
+        <button class="aw-del" onclick="delWeapon(${w.id})">Supprimer</button>
+      </div>`).join('');
+  }
+
+  function addWeapon() {
+    const name = document.getElementById('a-name').value.trim();
+    const cat = document.getElementById('a-cat').value;
+    const price = parseInt(document.getElementById('a-price').value)||0;
+    const emoji = document.getElementById('a-emoji').value.trim() || '🔫';
+    const desc = document.getElementById('a-desc').value.trim() || 'Arme disponible.';
+    if (!name || !price) { alert('Remplis le nom et le prix.'); return; }
+    weapons.push({id: Date.now(), name, cat, price, emoji, desc});
+    renderCatalog(); renderAdminWeapons();
+    ['a-name','a-price','a-emoji','a-desc'].forEach(id => document.getElementById(id).value = '');
+  }
+
+  function delWeapon(id) {
+    weapons = weapons.filter(w => w.id !== id);
+    renderCatalog(); renderAdminWeapons();
+  }
+
+  function renderAdminOrders() {
+    const el = document.getElementById('admin-orders-list');
+    if (!orders.length) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px">Aucune commande pour l\'instant.</div>'; return; }
+    el.innerHTML = orders.map(o => `
+      <div class="order-card">
+        <div class="oca-header">
+          <div><div class="oca-pseudo">${o.pseudo}</div><div class="oca-gang">${o.gang} · ${o.phone}</div></div>
+          <span class="status-badge ${o.status==='done'?'badge-done':'badge-pending'}">${o.status==='done'?'TERMINÉ':'EN ATTENTE'}</span>
+        </div>
+        <div class="oca-items">${o.items.map(i=>i.name+' x'+i.qty).join(' · ')}</div>
+        <div class="oca-total">${fmt(o.total)}</div>
+        ${o.status!=='done'?`<div class="oca-actions">
+          <button class="btn-terminate" onclick="markDone(${o.id})">⚔ Terminer → notifier Discord</button>
+          <button class="btn-delete" onclick="delOrder(${o.id})">Supprimer</button>
+        </div>`:''}
+      </div>`).join('');
+  }
+
+  function markDone(id) {
+    const o = orders.find(x => x.id===id);
+    if (o) o.status = 'done';
+    renderAdminOrders();
+  }
+  function delOrder(id) { orders = orders.filter(x => x.id!==id); renderAdminOrders(); }
+
+  // ---- INIT ----
+  loadUser();
+  renderCatalog();
+</script>
+</body>
+</html>
