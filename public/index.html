@@ -377,7 +377,7 @@
 </div>
 
 <script>
-  const MARKUP = 500000;
+  
   let weapons = [];
   let cart = {};
   let currentUser = null;
@@ -392,7 +392,7 @@
   let activeTab = 'orders';
 
   function fmt(n) { return Number(n).toLocaleString('fr-FR') + '€'; }
-  function totalPrice(w) { return w.price + MARKUP; }
+  function totalPrice(w) { return w.price; }
 
   // =================== AUTH ===================
   async function loadUser() {
