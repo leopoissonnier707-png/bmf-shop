@@ -93,10 +93,10 @@ app.post('/api/order', async (req, res) => {
     return res.status(401).json({ error: 'Non connecté' });
   }
 
-  const { pseudo, gang, signature, items, total } = req.body;
+  const { pseudo, gang, phone, signature, items, total } = req.body;
   const user = req.session.user;
 
-  if (!pseudo || !gang || !signature || !items || !total) {
+  if (!pseudo || !gang || !phone || !signature || !items || !total) {
     return res.status(400).json({ error: 'Champs manquants' });
   }
 
@@ -115,7 +115,8 @@ app.post('/api/order', async (req, res) => {
         { name: '🎮 Compte Discord', value: `<@${user.id}> (${user.username})`, inline: true },
         { name: '👤 Pseudo illégal', value: pseudo, inline: true },
         { name: '🏴 Groupe illégal', value: gang, inline: true },
-        { name: '✍️ Signature', value: signature, inline: true },
+        { name: '📞 Téléphone RP', value: phone, inline: true },
+        { name: '✍️ Signature', value: 'Signée ✅', inline: true },
         { name: '📦 Articles commandés', value: itemsList },
         { name: '💰 Total argent sale', value: `**${total.toLocaleString('fr-FR')}€**`, inline: true },
         { name: '🆔 Discord ID', value: user.id, inline: true }
