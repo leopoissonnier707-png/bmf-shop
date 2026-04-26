@@ -390,6 +390,7 @@
         <div class="form-grid">
           <div class="field"><label>Pseudo illégal <span class="req">*</span></label><input type="text" id="f-pseudo" placeholder="Tony Montana"></div>
           <div class="field"><label>Groupe illégal <span class="req">*</span></label><input type="text" id="f-gang" placeholder="Los Santos Cartel"></div>
+          <div class="field full"><label>Numéro de téléphone RP <span class="req">*</span></label><input type="text" id="f-phone" placeholder="555-0147"></div>
         </div>
 
         <div class="signature-box" style="margin-top:14px">
@@ -444,9 +445,10 @@
   async function submitOrder() {
     const pseudo = document.getElementById('f-pseudo')?.value.trim();
     const gang = document.getElementById('f-gang')?.value.trim();
+    const phone = document.getElementById('f-phone')?.value.trim();
     const cgu = document.getElementById('f-cgu')?.checked;
 
-    if (!pseudo||!gang) { alert('Remplis tous les champs obligatoires.'); return; }
+    if (!pseudo||!gang||!phone) { alert('Remplis tous les champs obligatoires.'); return; }
     if (isSignatureEmpty()) { alert('Tu dois signer avant de commander.'); return; }
     if (!cgu) { alert('Tu dois accepter les conditions BMF.'); return; }
 
@@ -464,7 +466,7 @@
       const res = await fetch('/api/order', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({pseudo, gang, signature, items, total})
+        body: JSON.stringify({pseudo, gang, phone, signature, items, total})
       });
       const data = await res.json();
       if (!data.success) throw new Error();
