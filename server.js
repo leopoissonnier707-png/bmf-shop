@@ -3,7 +3,6 @@ const express = require('express');
 const session = require('express-session');
 const axios = require('axios');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,39 +22,67 @@ const REDIRECT_URL = process.env.REDIRECT_URL || `http://localhost:${PORT}/auth/
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // =====================
-// PERSISTANCE JSON (fichiers)
+// PERSISTANCE MONGODB ATLAS (persistante à vie)
 // =====================
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const { MongoClient } = require('mongodb');
+const MONGO_URI = process.env.MONGO_URI;
+let db = null;
 
-function readJSON(file, def) {
-  const fp = path.join(DATA_DIR, file);
-  try { return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch { return def; }
-}
-function writeJSON(file, data) {
-  fs.writeFileSync(path.join(DATA_DIR, file), JSON.stringify(data, null, 2));
+async function getDB() {
+  if (db) return db;
+  const client = new MongoClient(MONGO_URI);
+  await client.connect();
+  db = client.db('bmfshop');
+  return db;
 }
 
-// Initialisation des fichiers si absents
-if (!fs.existsSync(path.join(DATA_DIR, 'orders.json'))) writeJSON('orders.json', []);
-if (!fs.existsSync(path.join(DATA_DIR, 'admins.json'))) writeJSON('admins.json', []);
-if (!fs.existsSync(path.join(DATA_DIR, 'weapons.json'))) writeJSON('weapons.json', [
-  { id:1, name:'Machine Pistol', cat:'Pistolet', price:1200000, desc:'Une arme automatique compacte mais puissante.', photos:[] },
-  { id:2, name:'Fusil à canon scié', cat:'Fusil', price:2000000, desc:'Un fusil brutal pour les combats à courte portée.', photos:[] },
-  { id:3, name:'AK-47', cat:'Fusil', price:2250000, desc:"Fusil d'assaut lourd et redoutable.", photos:[] },
-  { id:4, name:'AK-U', cat:'Fusil', price:2500000, desc:"Version compacte d'un fusil d'assaut.", photos:[] },
-]);
-if (!fs.existsSync(path.join(DATA_DIR, 'promos.json'))) writeJSON('promos.json', [
-  { code:'BMFVIP', discount:10, active:true, usages:0, createdAt: new Date().toISOString() },
-]);
+async function readJSON(collection, def) {
+  try {
+    const database = await getDB();
+    const docs = await database.collection(collection).find({}).toArray();
+    return docs.length ? docs : def;
+  } catch (e) { console.error('DB read error:', e.message); return def; }
+}
+
+async function writeJSON(collection, data) {
+  try {
+    const database = await getDB();
+    await database.collection(collection).deleteMany({});
+    if (Array.isArray(data) && data.length > 0) {
+      await database.collection(collection).insertMany(data);
+    }
+  } catch (e) { console.error('DB write error:', e.message); }
+}
+
+async function initDB() {
+  try {
+    const database = await getDB();
+    const weapons = await database.collection('weapons').find({}).toArray();
+    if (!weapons.length) {
+      console.log('DB initialisée - catalogue vide, ajoutez vos armes depuis le panel admin');
+    }
+    const promos = await database.collection('promos').find({}).toArray();
+    if (!promos.length) {
+      await database.collection('promos').insertMany([
+        { code:'BMFVIP', discount:10, active:true, usages:0, createdAt: new Date().toISOString() }
+      ]);
+    }
+    console.log('MongoDB connecté avec succès !');
+  } catch (e) {
+    console.error('Erreur connexion MongoDB:', e.message);
+  }
+}
 
 // =====================
 // ADMIN CHECK
 // =====================
-function isAdminId(id) {
+async function isAdminId(id) {
   if (id === ADMIN_DISCORD_ID) return true;
-  const admins = readJSON('admins.json', []);
-  return admins.some(a => a.id === id);
+  try {
+    const database = await getDB();
+    const admin = await database.collection('admins').findOne({ id });
+    return !!admin;
+  } catch(e) { return false; }
 }
 
 // =====================
@@ -110,7 +137,7 @@ app.get('/auth/callback', async (req, res) => {
       avatar: user.avatar,
       globalName: user.global_name || user.username
     };
-    req.session.isAdmin = isAdminId(user.id);
+    req.session.isAdmin = await isAdminId(user.id);
     res.redirect('/');
   } catch (err) {
     console.error('Erreur OAuth2:', err.message);
@@ -126,9 +153,9 @@ app.get('/auth/logout', (req, res) => {
 // =====================
 // API — UTILISATEUR
 // =====================
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
   if (req.session.user) {
-    req.session.isAdmin = isAdminId(req.session.user.id);
+    req.session.isAdmin = await isAdminId(req.session.user.id);
     res.json({ user: req.session.user, isAdmin: req.session.isAdmin });
   } else {
     res.json({ user: null, isAdmin: false });
@@ -138,71 +165,73 @@ app.get('/api/me', (req, res) => {
 // =====================
 // API — ARMES (lecture publique, écriture admin)
 // =====================
-app.get('/api/weapons', (req, res) => {
-  res.json(readJSON('weapons.json', []));
+app.get('/api/weapons', async (req, res) => {
+  res.json(await readJSON('weapons', []));
 });
 
-app.post('/api/weapons', (req, res) => {
+app.post('/api/weapons', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  const weapons = readJSON('weapons.json', []);
-  const { name, cat, price, desc, photos } = req.body;
+  const { name, cat, price, desc, photos, currency } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Champs manquants' });
-  const weapon = { id: Date.now(), name, cat: cat || 'Autre', price: parseInt(price), desc: desc || '', photos: photos || [] };
-  weapons.push(weapon);
-  writeJSON('weapons.json', weapons);
-  res.json({ success: true, weapon });
+  const weapon = { id: Date.now(), name, cat: cat || 'Autre', price: parseInt(price), desc: desc || '', photos: photos || [], currency: currency || 'sale' };
+  try {
+    const database = await getDB();
+    await database.collection('weapons').insertOne(weapon);
+    res.json({ success: true, weapon });
+  } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
 
-app.put('/api/weapons/:id', (req, res) => {
+app.put('/api/weapons/:id', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  let weapons = readJSON('weapons.json', []);
-  const idx = weapons.findIndex(w => w.id == req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Introuvable' });
-  weapons[idx] = { ...weapons[idx], ...req.body, id: weapons[idx].id };
-  writeJSON('weapons.json', weapons);
-  res.json({ success: true });
+  try {
+    const database = await getDB();
+    const { _id, ...update } = req.body;
+    await database.collection('weapons').updateOne({ id: parseInt(req.params.id) }, { $set: update });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
 
-app.delete('/api/weapons/:id', (req, res) => {
+app.delete('/api/weapons/:id', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  let weapons = readJSON('weapons.json', []);
-  weapons = weapons.filter(w => w.id != req.params.id);
-  writeJSON('weapons.json', weapons);
-  res.json({ success: true });
+  try {
+    const database = await getDB();
+    await database.collection('weapons').deleteOne({ id: parseInt(req.params.id) });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
 
 // =====================
 // API — CODES PROMO
 // =====================
-app.get('/api/promos', (req, res) => {
+app.get('/api/promos', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  res.json(readJSON('promos.json', []));
+  const database = await getDB();
+  res.json(await database.collection('promos').find({}).toArray());
 });
 
-app.post('/api/promos', (req, res) => {
+app.post('/api/promos', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  const promos = readJSON('promos.json', []);
   const { code, discount } = req.body;
   if (!code || !discount) return res.status(400).json({ error: 'Champs manquants' });
-  if (promos.find(p => p.code.toUpperCase() === code.toUpperCase())) return res.status(400).json({ error: 'Code déjà existant' });
+  const database = await getDB();
+  const exists = await database.collection('promos').findOne({ code: code.toUpperCase() });
+  if (exists) return res.status(400).json({ error: 'Code déjà existant' });
   const promo = { code: code.toUpperCase(), discount: parseInt(discount), active: true, usages: 0, createdAt: new Date().toISOString() };
-  promos.push(promo);
-  writeJSON('promos.json', promos);
+  await database.collection('promos').insertOne(promo);
   res.json({ success: true, promo });
 });
 
-app.delete('/api/promos/:code', (req, res) => {
+app.delete('/api/promos/:code', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  let promos = readJSON('promos.json', []);
-  promos = promos.filter(p => p.code !== req.params.code);
-  writeJSON('promos.json', promos);
+  const database = await getDB();
+  await database.collection('promos').deleteOne({ code: req.params.code });
   res.json({ success: true });
 });
 
-app.post('/api/promos/check', (req, res) => {
+app.post('/api/promos/check', async (req, res) => {
   const { code } = req.body;
-  const promos = readJSON('promos.json', []);
-  const promo = promos.find(p => p.code === code?.toUpperCase() && p.active);
+  const database = await getDB();
+  const promo = await database.collection('promos').findOne({ code: code?.toUpperCase(), active: true });
   if (!promo) return res.status(404).json({ error: 'Code invalide ou inactif' });
   res.json({ discount: promo.discount, code: promo.code });
 });
@@ -210,9 +239,11 @@ app.post('/api/promos/check', (req, res) => {
 // =====================
 // API — COMMANDES
 // =====================
-app.get('/api/orders', (req, res) => {
+app.get('/api/orders', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  res.json(readJSON('orders.json', []));
+  const database = await getDB();
+  const orders = await database.collection('orders').find({}).sort({ createdAt: -1 }).toArray();
+  res.json(orders);
 });
 
 app.post('/api/order', async (req, res) => {
@@ -227,9 +258,10 @@ app.post('/api/order', async (req, res) => {
 
   // Incrémenter usage promo
   if (promoCode) {
-    const promos = readJSON('promos.json', []);
-    const idx = promos.findIndex(p => p.code === promoCode);
-    if (idx !== -1) { promos[idx].usages = (promos[idx].usages || 0) + 1; writeJSON('promos.json', promos); }
+    try {
+      const database = await getDB();
+      await database.collection('promos').updateOne({ code: promoCode }, { $inc: { usages: 1 } });
+    } catch(e) {}
   }
 
   const avatarUrl = user.avatar
@@ -239,8 +271,7 @@ app.post('/api/order', async (req, res) => {
   const itemsList = items.map(i => `• **${i.name}** x${i.qty} — ${i.sub.toLocaleString('fr-FR')}€`).join('\n');
   const promoLine = promoCode ? `\n🏷️ Code promo: **${promoCode}** (-${discount}%)` : '';
 
-  // Sauvegarder la commande côté serveur
-  const orders = readJSON('orders.json', []);
+  // Sauvegarder la commande côté serveur (MongoDB)
   const order = {
     id: Date.now(),
     pseudo, gang, phone,
@@ -252,8 +283,10 @@ app.post('/api/order', async (req, res) => {
     status: 'pending',
     createdAt: new Date().toISOString()
   };
-  orders.unshift(order); // plus récent en premier
-  writeJSON('orders.json', orders);
+  try {
+    const database = await getDB();
+    await database.collection('orders').insertOne(order);
+  } catch(e) { console.error('Erreur sauvegarde commande:', e.message); }
 
   // Envoyer sur Discord Webhook
   const embed = {
@@ -292,14 +325,11 @@ app.post('/api/order/done', async (req, res) => {
 
   const { orderId, discordId, pseudo } = req.body;
 
-  // Mettre à jour le statut de la commande
-  const orders = readJSON('orders.json', []);
-  const idx = orders.findIndex(o => o.id == orderId);
-  if (idx !== -1) {
-    orders[idx].status = 'done';
-    orders[idx].doneAt = new Date().toISOString();
-    writeJSON('orders.json', orders);
-  }
+  // Mettre à jour le statut de la commande (MongoDB)
+  try {
+    const database = await getDB();
+    await database.collection('orders').updateOne({ id: parseInt(orderId) }, { $set: { status: 'done', doneAt: new Date().toISOString() } });
+  } catch(e) { console.error('Erreur update order:', e.message); }
 
   // Envoyer MP Discord si BOT_TOKEN configuré
   if (BOT_TOKEN && discordId) {
@@ -329,53 +359,53 @@ app.post('/api/order/done', async (req, res) => {
   res.json({ success: true });
 });
 
-app.delete('/api/order/:id', (req, res) => {
+app.delete('/api/order/:id', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  let orders = readJSON('orders.json', []);
-  orders = orders.filter(o => o.id != req.params.id);
-  writeJSON('orders.json', orders);
+  const database = await getDB();
+  await database.collection('orders').deleteOne({ id: parseInt(req.params.id) });
   res.json({ success: true });
 });
 
 // =====================
 // API — ADMINS
 // =====================
-app.get('/api/admins', (req, res) => {
+app.get('/api/admins', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  res.json(readJSON('admins.json', []));
+  const database = await getDB();
+  res.json(await database.collection('admins').find({}).toArray());
 });
 
-app.post('/api/admins', (req, res) => {
+app.post('/api/admins', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
   const { id, note } = req.body;
   if (!id) return res.status(400).json({ error: 'ID manquant' });
-  const admins = readJSON('admins.json', []);
-  if (admins.find(a => a.id === id)) return res.status(400).json({ error: 'Admin déjà existant' });
-  admins.push({ id, note: note || '', addedAt: new Date().toISOString() });
-  writeJSON('admins.json', admins);
+  const database = await getDB();
+  const exists = await database.collection('admins').findOne({ id });
+  if (exists) return res.status(400).json({ error: 'Admin déjà existant' });
+  await database.collection('admins').insertOne({ id, note: note || '', addedAt: new Date().toISOString() });
   res.json({ success: true });
 });
 
-app.delete('/api/admins/:id', (req, res) => {
+app.delete('/api/admins/:id', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  let admins = readJSON('admins.json', []);
-  admins = admins.filter(a => a.id !== req.params.id);
-  writeJSON('admins.json', admins);
+  const database = await getDB();
+  await database.collection('admins').deleteOne({ id: req.params.id });
   res.json({ success: true });
 });
 
 // =====================
 // API — STATS
 // =====================
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
-  const orders = readJSON('orders.json', []);
+  const database = await getDB();
+  const orders = await database.collection('orders').find({}).toArray();
   const pending = orders.filter(o => o.status === 'pending').length;
   const done = orders.filter(o => o.status === 'done').length;
   const totalRevenue = orders.filter(o => o.status === 'done').reduce((a, o) => a + o.total, 0);
-  const weapons = readJSON('weapons.json', []);
-  const admins = readJSON('admins.json', []);
-  res.json({ pending, done, total: orders.length, totalRevenue, weaponCount: weapons.length, adminCount: admins.length + 1 });
+  const weaponCount = await database.collection('weapons').countDocuments();
+  const adminCount = await database.collection('admins').countDocuments();
+  res.json({ pending, done, total: orders.length, totalRevenue, weaponCount, adminCount: adminCount + 1 });
 });
 
 // =====================
@@ -385,6 +415,11 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`BMF Shop démarré sur le port ${PORT}`);
+initDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`BMF Shop démarré sur le port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Impossible de démarrer sans MongoDB:', err.message);
+  process.exit(1);
 });
