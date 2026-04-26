@@ -210,6 +210,7 @@
     <div class="admin-tabs">
       <button class="tab-btn active" onclick="switchTab('weapons')">Armes</button>
       <button class="tab-btn" onclick="switchTab('orders')">Commandes</button>
+      <button class="tab-btn" onclick="switchTab('admins')">Admins</button>
     </div>
     <div id="tab-weapons">
       <div class="add-form">
@@ -228,6 +229,17 @@
       <div id="admin-weapon-list"></div>
     </div>
     <div id="tab-orders" style="display:none">
+    </div>
+    <div id="tab-admins" style="display:none">
+      <div class="add-form">
+        <div class="add-form-title">AJOUTER UN ADMIN</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Entrez l'ID Discord du membre à promouvoir admin. Il aura accès au panel admin du site.</div>
+        <div class="form-grid">
+          <div class="field full"><label>ID Discord</label><input type="text" id="new-admin-id" placeholder="123456789012345678"></div>
+        </div>
+        <button class="btn-confirm" onclick="addAdmin()">Ajouter comme admin</button>
+      </div>
+      <div id="admin-list"></div>
       <div id="admin-orders-list"></div>
     </div>
   </div>
@@ -490,12 +502,43 @@
   }
 
   // ADMIN
+  let extraAdmins = JSON.parse(localStorage.getItem('bmf_admins') || '[]');
+
+  function addAdmin() {
+    const id = document.getElementById('new-admin-id').value.trim();
+    if (!id || id.length < 17) { alert('ID Discord invalide.'); return; }
+    if (extraAdmins.find(a => a.id === id)) { alert('Cet admin existe déjà.'); return; }
+    extraAdmins.push({ id, addedAt: new Date().toLocaleDateString('fr-FR') });
+    localStorage.setItem('bmf_admins', JSON.stringify(extraAdmins));
+    document.getElementById('new-admin-id').value = '';
+    renderAdminList();
+    alert('Pour rendre cet admin permanent, allez sur Render → Environment → ajoutez la variable EXTRA_ADMIN_IDS avec la valeur : ' + id);
+  }
+
+  function removeAdmin(id) {
+    extraAdmins = extraAdmins.filter(a => a.id !== id);
+    localStorage.setItem('bmf_admins', JSON.stringify(extraAdmins));
+    renderAdminList();
+  }
+
+  function renderAdminList() {
+    const el = document.getElementById('admin-list');
+    if (!el) return;
+    if (!extraAdmins.length) {
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Aucun admin supplémentaire.<br><br>Pour ajouter un admin permanent :<br>Render → Environment → <strong style=\"color:var(--teal)\">EXTRA_ADMIN_IDS</strong> = ID Discord<br>(Séparez plusieurs IDs par des virgules)</div>';
+      return;
+    }
+    el.innerHTML = extraAdmins.map(a => '<div class="admin-weapon-row"><div class="aw-info"><div class="aw-name">ID: ' + a.id + '</div><div class="aw-meta">Ajouté le ' + a.addedAt + '</div></div><button class="aw-del" onclick="removeAdmin(\'' + a.id + '\')">Supprimer</button></div>').join('');
+  }
+
   function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',(tab==='weapons'&&i===0)||(tab==='orders'&&i===1)));
+    document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',(tab==='weapons'&&i===0)||(tab==='orders'&&i===1)||(tab==='admins'&&i===2)));
     document.getElementById('tab-weapons').style.display=tab==='weapons'?'block':'none';
     document.getElementById('tab-orders').style.display=tab==='orders'?'block':'none';
+    document.getElementById('tab-admins').style.display=tab==='admins'?'block':'none';
     if(tab==='orders')renderAdminOrders();
     if(tab==='weapons')renderAdminWeapons();
+    if(tab==='admins')renderAdminList();
   }
 
   function renderAdminWeapons() {
