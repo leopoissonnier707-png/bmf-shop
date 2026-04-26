@@ -6,19 +6,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// =====================
-// CONFIG
-// =====================
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'bmfsecret';
 const REDIRECT_URL = process.env.REDIRECT_URL || `http://localhost:${PORT}/auth/callback`;
+const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// =====================
-// MIDDLEWARE
-// =====================
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
@@ -31,8 +26,6 @@ app.use(session({
 // =====================
 // AUTH DISCORD OAUTH2
 // =====================
-
-// Redirige vers Discord pour login
 app.get('/auth/discord', (req, res) => {
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
@@ -43,13 +36,10 @@ app.get('/auth/discord', (req, res) => {
   res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
 });
 
-// Callback après login Discord
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.redirect('/');
-
   try {
-    // Échange le code contre un token
     const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
       new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
@@ -61,22 +51,19 @@ app.get('/auth/callback', async (req, res) => {
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
-
     const accessToken = tokenRes.data.access_token;
-
-    // Récupère l'utilisateur Discord
     const userRes = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-
     const user = userRes.data;
     req.session.user = {
       id: user.id,
       username: user.username,
-      avatar: user.avatar
+      discriminator: user.discriminator,
+      avatar: user.avatar,
+      globalName: user.global_name || user.username
     };
     req.session.isAdmin = (user.id === ADMIN_DISCORD_ID);
-
     res.redirect('/');
   } catch (err) {
     console.error('Erreur OAuth2:', err.message);
@@ -84,7 +71,6 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Déconnexion
 app.get('/auth/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/');
@@ -93,8 +79,6 @@ app.get('/auth/logout', (req, res) => {
 // =====================
 // API
 // =====================
-
-// Récupère la session utilisateur
 app.get('/api/me', (req, res) => {
   if (req.session.user) {
     res.json({ user: req.session.user, isAdmin: req.session.isAdmin });
@@ -103,13 +87,22 @@ app.get('/api/me', (req, res) => {
   }
 });
 
-// Soumet une commande → envoie un message webhook Discord
+// Soumettre une commande
 app.post('/api/order', async (req, res) => {
-  const { pseudo, gang, phone, items, total } = req.body;
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Non connecté' });
+  }
 
-  if (!pseudo || !gang || !phone || !items || !total) {
+  const { pseudo, gang, signature, items, total } = req.body;
+  const user = req.session.user;
+
+  if (!pseudo || !gang || !signature || !items || !total) {
     return res.status(400).json({ error: 'Champs manquants' });
   }
+
+  const avatarUrl = user.avatar
+    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+    : `https://cdn.discordapp.com/embed/avatars/0.png`;
 
   const itemsList = items.map(i => `• **${i.name}** x${i.qty} — ${i.sub.toLocaleString('fr-FR')}€`).join('\n');
 
@@ -117,57 +110,72 @@ app.post('/api/order', async (req, res) => {
     embeds: [{
       title: '🔫 Nouvelle commande BMF',
       color: 0x00d4c8,
+      thumbnail: { url: avatarUrl },
       fields: [
+        { name: '🎮 Compte Discord', value: `<@${user.id}> (${user.username})`, inline: true },
         { name: '👤 Pseudo illégal', value: pseudo, inline: true },
-        { name: '🏴 Groupe', value: gang, inline: true },
-        { name: '📞 Téléphone RP', value: phone, inline: true },
+        { name: '🏴 Groupe illégal', value: gang, inline: true },
+        { name: '✍️ Signature', value: signature, inline: true },
         { name: '📦 Articles commandés', value: itemsList },
-        { name: '💰 Total argent sale', value: `**${total.toLocaleString('fr-FR')}€**`, inline: true }
+        { name: '💰 Total argent sale', value: `**${total.toLocaleString('fr-FR')}€**`, inline: true },
+        { name: '🆔 Discord ID', value: user.id, inline: true }
       ],
-      footer: { text: 'BMF Shop · Commande en attente de traitement' },
+      footer: { text: `BMF Shop · Commande en attente · ID: ${user.id}` },
       timestamp: new Date().toISOString()
-    }]
+    }],
+    // Bouton terminer via components (webhook simple, pas de bot)
+    content: `📦 **Nouvelle commande** de ${user.username} | ID client: \`${user.id}\``
   };
 
   try {
-    await axios.post(DISCORD_WEBHOOK_URL, embed);
+    await axios.post(DISCORD_WEBHOOK_URL + '?wait=true', embed);
     res.json({ success: true });
   } catch (err) {
-    console.error('Erreur webhook:', err.message);
+    console.error('Erreur webhook:', err.response?.data || err.message);
     res.status(500).json({ error: 'Erreur envoi Discord' });
   }
 });
 
-// Notifie le client (webhook) que la commande est prête
+// Notifier le client que la commande est prête (MP via bot)
 app.post('/api/order/done', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
 
-  const { pseudo, gang, slots } = req.body;
+  const { discordId, pseudo } = req.body;
 
-  const embed = {
-    embeds: [{
-      title: '✅ Commande prête — BMF',
-      color: 0x4ade80,
-      description: `La commande de **${pseudo}** (${gang}) est prête à être livrée.`,
-      fields: [
-        { name: '📅 Créneaux proposés', value: slots.join('\n') }
-      ],
-      footer: { text: 'BMF Shop · Choisissez votre créneau' },
-      timestamp: new Date().toISOString()
-    }]
-  };
+  if (!BOT_TOKEN) {
+    return res.status(500).json({ error: 'BOT_TOKEN non configuré' });
+  }
 
   try {
-    await axios.post(DISCORD_WEBHOOK_URL, embed);
+    // Créer un DM channel avec l'utilisateur
+    const dmRes = await axios.post(`https://discord.com/api/v10/users/@me/channels`,
+      { recipient_id: discordId },
+      { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
+    );
+
+    const channelId = dmRes.data.id;
+
+    // Envoyer le message MP
+    await axios.post(`https://discord.com/api/v10/channels/${channelId}/messages`,
+      {
+        embeds: [{
+          title: '✅ Votre commande BMF est prête !',
+          color: 0x4ade80,
+          description: `Bonjour **${pseudo}** ! 🎮\n\nVotre commande sur **BMF Shop** est prête.\nVous serez contacté **en jeu** très prochainement par un membre du staff BMF.\n\nMerci de votre confiance ! 🔫`,
+          footer: { text: 'BMF Black Market · RP FiveM' },
+          timestamp: new Date().toISOString()
+        }]
+      },
+      { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
+    );
+
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: 'Erreur webhook' });
+    console.error('Erreur MP Discord:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Erreur envoi MP' });
   }
 });
 
-// =====================
-// FALLBACK → index.html
-// =====================
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
