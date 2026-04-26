@@ -264,7 +264,7 @@
 <!-- SHOP -->
 <div id="page-shop" class="page active">
   <div class="shop-header">
-    <div class="shop-title">Armurerie BMF</div>
+    <div class="shop-title">BMF Shop</div>
     <div class="shop-sub">// Paiement argent sale · Livraison en jeu · Organisation BMF</div>
     <div class="cat-filters" id="cat-filters"></div>
   </div>
@@ -318,7 +318,13 @@
         <div class="form-grid">
           <div class="field"><label>Nom</label><input type="text" id="a-name" placeholder="Nom de l'arme"></div>
           <div class="field"><label>Catégorie</label>
-            <select id="a-cat"><option>Pistolet</option><option>Fusil</option><option>Sniper</option><option>Explosif</option><option>Couteau</option><option>Autre</option></select>
+            <select id="a-cat" id="a-cat">
+                <option>Pistolet</option><option>Fusil</option><option>Sniper</option><option>Explosif</option><option>Couteau</option><option>Drogue</option><option>Autre</option>
+              </select>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <input type="text" id="new-cat-input" placeholder="Nouvelle catégorie..." style="flex:1;padding:6px 10px;background:var(--bg2);border:1px solid rgba(0,212,200,0.25);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+                <button onclick="addNewCat()" style="padding:6px 12px;background:var(--teal);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">+</button>
+              </div>
           </div>
           <div class="field"><label>Prix argent sale (€)</label><input type="number" id="a-price" placeholder="1200000"></div>
           <div class="field"><label>Description</label><input type="text" id="a-desc" placeholder="Description courte"></div>
@@ -931,6 +937,18 @@
     if (!confirm('Retirer cet admin ?')) return;
     await fetch('/api/admins/'+id, {method:'DELETE'});
     loadAdminList();
+  }
+
+  function addNewCat() {
+    const val = document.getElementById('new-cat-input').value.trim();
+    if (!val) return;
+    const sel = document.getElementById('a-cat');
+    for (let opt of sel.options) { if (opt.value === val) { sel.value = val; document.getElementById('new-cat-input').value=''; return; } }
+    const opt = document.createElement('option');
+    opt.value = val; opt.text = val;
+    sel.appendChild(opt);
+    sel.value = val;
+    document.getElementById('new-cat-input').value = '';
   }
 
   // INIT
