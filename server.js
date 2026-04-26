@@ -10,6 +10,9 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID;
+const EXTRA_ADMIN_IDS = (process.env.EXTRA_ADMIN_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
+const ALL_ADMIN_IDS = [ADMIN_DISCORD_ID, ...EXTRA_ADMIN_IDS].filter(Boolean);
+function isAdminId(id) { return ALL_ADMIN_IDS.includes(id); }
 const SESSION_SECRET = process.env.SESSION_SECRET || 'bmfsecret';
 const REDIRECT_URL = process.env.REDIRECT_URL || `http://localhost:${PORT}/auth/callback`;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -63,7 +66,7 @@ app.get('/auth/callback', async (req, res) => {
       avatar: user.avatar,
       globalName: user.global_name || user.username
     };
-    req.session.isAdmin = (user.id === ADMIN_DISCORD_ID);
+    req.session.isAdmin = isAdminId(user.id);
     res.redirect('/');
   } catch (err) {
     console.error('Erreur OAuth2:', err.message);
@@ -139,7 +142,7 @@ app.post('/api/order', async (req, res) => {
 
 // Notifier le client que la commande est prête (MP via bot)
 app.post('/api/order/done', async (req, res) => {
-  if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
+  if (!req.session.isAdmin) return res.status(403).json({ error: "Non autorisé" });
 
   const { discordId, pseudo } = req.body;
 
