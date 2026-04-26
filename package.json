@@ -1,7 +1,7 @@
 
 {
   "name": "bmf-shop",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "BMF Shop - Site de commande RP FiveM",
   "main": "server.js",
   "scripts": {
@@ -11,7 +11,8 @@
   "dependencies": {
     "axios": "^1.6.0",
     "express": "^4.18.2",
-    "express-session": "^1.17.3"
+    "express-session": "^1.17.3",
+    "mongodb": "^6.3.0"
   },
   "engines": {
     "node": ">=18.0.0"
