@@ -325,8 +325,15 @@
                 <input type="text" id="new-cat-input" placeholder="Nouvelle catégorie..." style="flex:1;padding:6px 10px;background:var(--bg2);border:1px solid rgba(0,212,200,0.25);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
                 <button onclick="addNewCat()" style="padding:6px 12px;background:var(--teal);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">+</button>
               </div>
+              <div style="margin-top:10px">
+                <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;letter-spacing:0.05em">Type de paiement</label>
+                <select id="a-currency" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid rgba(0,212,200,0.25);border-radius:6px;color:var(--text);font-size:13px;outline:none;">
+                  <option value="sale">💸 Argent sale</option>
+                  <option value="propre">💵 Argent propre</option>
+                </select>
+              </div>
           </div>
-          <div class="field"><label>Prix argent sale (€)</label><input type="number" id="a-price" placeholder="1200000"></div>
+          <div class="field"><label>Prix (€)</label><input type="number" id="a-price" placeholder="1200000"></div>
           <div class="field"><label>Description</label><input type="text" id="a-desc" placeholder="Description courte"></div>
         </div>
         <div class="photos-upload-area" style="margin-top:10px">
@@ -484,7 +491,7 @@
         <div class="card-body">
           <div class="card-name">${w.name}</div>
           <div class="card-desc">${w.desc || ''}</div>
-          <div class="card-price">${fmt(totalPrice(w))}</div>
+          <div class="card-price">${fmt(totalPrice(w))} <span style="font-size:11px;color:var(--muted);font-weight:400">${w.currency==='propre'?'💵 Argent propre':'💸 Argent sale'}</span></div>
           <button class="add-btn" onclick="event.stopPropagation();addToCart(${w.id})">+ Ajouter</button>
         </div>
       </div>`;
@@ -823,7 +830,7 @@
       return `<div class="admin-weapon-row">
         <div class="aw-thumb">${thumb}</div>
         <div class="aw-info"><div class="aw-name">${w.name}</div><div class="aw-meta">${w.cat} · ${w.photos?.length||0} photo(s)</div></div>
-        <div class="aw-price">${fmt(totalPrice(w))}</div>
+        <div class="aw-price">${fmt(totalPrice(w))} <span style="font-size:11px;opacity:0.7">${w.currency==='propre'?'💵':'💸'}</span></div>
         <button class="aw-del" onclick="delWeapon(${w.id})">Supprimer</button>
       </div>`;
     }).join('') || '<div style="text-align:center;padding:20px;color:var(--muted)">Aucune arme dans le catalogue.</div>';
