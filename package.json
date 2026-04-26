@@ -1,6 +1,7 @@
+
 {
   "name": "bmf-shop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "BMF Shop - Site de commande RP FiveM",
   "main": "server.js",
   "scripts": {
