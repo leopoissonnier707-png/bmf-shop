@@ -377,7 +377,6 @@
 </div>
 
 <script>
-  const MARKUP = 500000;
   let weapons = [];
   let cart = {};
   let currentUser = null;
@@ -392,7 +391,7 @@
   let activeTab = 'orders';
 
   function fmt(n) { return Number(n).toLocaleString('fr-FR') + '€'; }
-  function totalPrice(w) { return w.price + MARKUP; }
+  function w.price { return w.price + MARKUP; }
 
   // =================== AUTH ===================
   async function loadUser() {
@@ -478,7 +477,7 @@
         <div class="card-body">
           <div class="card-name">${w.name}</div>
           <div class="card-desc">${w.desc || ''}</div>
-          <div class="card-price">${fmt(totalPrice(w))}</div>
+          <div class="card-price">${fmt(w.price)}</div>
           <button class="add-btn" onclick="event.stopPropagation();addToCart(${w.id})">+ Ajouter</button>
         </div>
       </div>`;
@@ -491,7 +490,7 @@
     if (!w) return;
     currentGalleryIdx = 0;
     renderGallery(w);
-    const price = totalPrice(w);
+    const price = w.price;
     document.getElementById('modal-body').innerHTML = `
       <div class="modal-name">${w.name}</div>
       <div class="modal-cat-badge">${w.cat.toUpperCase()}</div>
@@ -557,11 +556,11 @@
     let baseTotal = 0;
     const itemsHtml = keys.map(k => {
       const w = weapons.find(x => x.id == k);
-      const sub = totalPrice(w) * cart[k]; baseTotal += sub;
+      const sub = w.price * cart[k]; baseTotal += sub;
       const thumb = (w.photos && w.photos.length) ? `<img src="${w.photos[0]}" alt="">` : '🔫';
       return `<div class="order-item">
         <div class="item-thumb">${(w.photos && w.photos.length) ? `<img src="${w.photos[0]}" alt="">` : '🔫'}</div>
-        <div class="item-info"><div class="item-name">${w.name}</div><div class="item-unit">${fmt(totalPrice(w))} / unité</div></div>
+        <div class="item-info"><div class="item-name">${w.name}</div><div class="item-unit">${fmt(w.price)} / unité</div></div>
         <div class="qty-wrap">
           <button class="qty-btn" onclick="chgQty(${k},-1)">−</button>
           <span class="qty-num">${cart[k]}</span>
@@ -675,7 +674,7 @@
     const keys = Object.keys(cart).filter(k=>cart[k]>0);
     if (!keys.length) { alert('Panier vide.'); return; }
     let baseTotal = 0;
-    const items = keys.map(k=>{const w=weapons.find(x=>x.id==k);const sub=totalPrice(w)*cart[k];baseTotal+=sub;return{name:w.name,qty:cart[k],sub};});
+    const items = keys.map(k=>{const w=weapons.find(x=>x.id==k);const sub=w.price*cart[k];baseTotal+=sub;return{name:w.name,qty:cart[k],sub};});
     const total = activePromo ? Math.round(baseTotal*(1-activePromo.discount/100)) : baseTotal;
     const btn = document.getElementById('submit-btn');
     btn.disabled=true; btn.textContent='Envoi en cours...';
@@ -817,7 +816,7 @@
       return `<div class="admin-weapon-row">
         <div class="aw-thumb">${thumb}</div>
         <div class="aw-info"><div class="aw-name">${w.name}</div><div class="aw-meta">${w.cat} · ${w.photos?.length||0} photo(s)</div></div>
-        <div class="aw-price">${fmt(totalPrice(w))}</div>
+        <div class="aw-price">${fmt(w.price)}</div>
         <button class="aw-del" onclick="delWeapon(${w.id})">Supprimer</button>
       </div>`;
     }).join('') || '<div style="text-align:center;padding:20px;color:var(--muted)">Aucune arme dans le catalogue.</div>';
