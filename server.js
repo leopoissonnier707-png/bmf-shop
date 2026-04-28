@@ -1,6 +1,7 @@
 
 const express = require('express');
 const session = require('express-session');
+const MongoStore = require('connect-mongo'); // ← AJOUTER cette ligne
 const axios = require('axios');
 const path = require('path');
 
@@ -89,11 +90,12 @@ async function isAdminId(id) {
 // MIDDLEWARE
 // =====================
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// APRÈS (ce que tu mets) :
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: MONGO_URI, dbName: 'bmfshop' }), // ← AJOUTER
   cookie: { secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', maxAge: 1000 * 60 * 60 * 24 * 7 }
 }));
 
