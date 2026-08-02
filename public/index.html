@@ -335,7 +335,6 @@
       <button class="tab-btn active" onclick="switchTab('orders')">📦 Commandes</button>
       <button class="tab-btn" onclick="switchTab('weapons')">🔫 Armes</button>
       <button class="tab-btn" onclick="switchTab('promos')">🏷️ Codes Promo</button>
-      <button class="tab-btn" onclick="switchTab('admins')">👤 Admins</button>
     </div>
     <div id="tab-orders">
       <div class="add-form" style="margin-bottom:14px">
@@ -397,18 +396,6 @@
         <button class="btn-confirm" onclick="addPromo()">Créer le code</button>
       </div>
       <div id="admin-promos-list"></div>
-    </div>
-    <div id="tab-admins" style="display:none">
-      <div class="add-form">
-        <div class="add-form-title">Ajouter un admin</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-family:'Share Tech Mono',monospace">Entrez l'ID Discord du membre à promouvoir. Sauvegardé sur le serveur — visible sur tous les navigateurs.</div>
-        <div class="form-grid">
-          <div class="field"><label>ID Discord</label><input type="text" id="new-admin-id" placeholder="123456789012345678"></div>
-          <div class="field"><label>Note (optionnel)</label><input type="text" id="new-admin-note" placeholder="Nom ou rôle"></div>
-        </div>
-        <button class="btn-confirm" onclick="addAdmin()">Ajouter comme admin</button>
-      </div>
-      <div id="admin-list"></div>
     </div>
   </div>
 </div>
@@ -518,8 +505,6 @@
   }
 
   function applyPermissionUI() {
-    const canManageAdmins = isAdmin; // seuls les vrais admins gèrent les admins et les rôles
-    document.querySelectorAll('.tab-btn')[3].style.display = canManageAdmins ? '' : 'none';
     document.getElementById('add-weapon-form-box').style.display = myPermissions.manageWeapons ? '' : 'none';
     document.getElementById('add-promo-form-box').style.display = myPermissions.managePromos ? '' : 'none';
   }
@@ -802,12 +787,11 @@
       const el = document.getElementById('tab-' + t);
       if (el) el.style.display = t === tab ? 'block' : 'none';
     });
-    const tabMap = {orders:0,weapons:1,promos:2,admins:3};
+    const tabMap = {orders:0,weapons:1,promos:2};
     document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===tabMap[tab]));
     if (tab==='orders') loadAdminOrders();
     if (tab==='weapons') loadAdminWeapons();
     if (tab==='promos') loadAdminPromos();
-    if (tab==='admins') loadAdminList();
   }
 
   // ORDERS ADMIN
@@ -982,35 +966,6 @@
     if (!confirm('Supprimer ce code promo ?')) return;
     await fetch('/api/promos/'+code, {method:'DELETE'});
     loadAdminPromos();
-  }
-
-  // ADMINS ADMIN
-  async function loadAdminList() {
-    const el=document.getElementById('admin-list');
-    try {
-      const r=await fetch('/api/admins');
-      const admins=await r.json();
-      el.innerHTML = admins.length ? admins.map(a=>`<div class="admin-weapon-row">
-        <div class="aw-info"><div class="aw-name">ID: ${a.id}</div><div class="aw-meta">${a.note||''} · Ajouté le ${new Date(a.addedAt).toLocaleDateString('fr-FR')}</div></div>
-        <button class="aw-del" onclick="delAdmin('${a.id}')">Supprimer</button>
-      </div>`).join('') : '<div style="text-align:center;padding:30px;color:var(--muted)">Aucun admin supplémentaire.<br><span style="font-family:Share Tech Mono;font-size:11px">Les admins sont maintenant sauvegardés sur le serveur — synchronisés sur tous les navigateurs.</span></div>';
-    } catch(e) {}
-  }
-
-  async function addAdmin() {
-    const id=document.getElementById('new-admin-id').value.trim();
-    const note=document.getElementById('new-admin-note').value.trim();
-    if (!id||id.length<17) { alert('ID Discord invalide (min 17 caractères).'); return; }
-    const r=await fetch('/api/admins',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,note})});
-    const d=await r.json();
-    if (d.success) { document.getElementById('new-admin-id').value=''; document.getElementById('new-admin-note').value=''; loadAdminList(); }
-    else alert(d.error||'Erreur');
-  }
-
-  async function delAdmin(id) {
-    if (!confirm('Retirer cet admin ?')) return;
-    await fetch('/api/admins/'+id, {method:'DELETE'});
-    loadAdminList();
   }
 
   function addNewCat() {
