@@ -20,7 +20,7 @@ const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'undergroundsecret2024';
 const REDIRECT_URL = process.env.REDIRECT_URL || `http://localhost:${PORT}/auth/callback`;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
+const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID; // ID du serveur Discord principal, pour la synchro des rôles
 
 // =====================
 // PERSISTANCE MONGODB ATLAS (persistante à vie)
@@ -61,12 +61,6 @@ async function initDB() {
     const weapons = await database.collection('weapons').find({}).toArray();
     if (!weapons.length) {
       console.log('DB initialisée - catalogue vide, ajoutez vos armes depuis le panel admin');
-    }
-    const promos = await database.collection('promos').find({}).toArray();
-    if (!promos.length) {
-      await database.collection('promos').insertMany([
-        { code:'UNDERGROUNDVIP', discount:10, active:true, usages:0, createdAt: new Date().toISOString() }
-      ]);
     }
     console.log('MongoDB connecté avec succès !');
   } catch (e) {
@@ -139,9 +133,10 @@ app.get('/auth/callback', async (req, res) => {
         await axios.get(`https://discord.com/api/v10/guilds/${DISCORD_GUILD_ID}/bans/${user.id}`, {
           headers: { Authorization: `Bot ${BOT_TOKEN}` }
         });
+        // Si la requête réussit (200), l'utilisateur EST banni
         return res.redirect('/?banned=1');
       } catch (banErr) {
-        // 404 = pas banni, cas normal
+        // 404 = pas banni, cas normal, on continue
       }
     }
 
@@ -245,6 +240,7 @@ app.post('/api/promos/check', async (req, res) => {
   if (!promo) return res.status(404).json({ error: 'Code invalide ou inactif' });
   res.json({ discount: promo.discount, code: promo.code });
 });
+
 // =====================
 // API — COMMANDES
 // =====================
@@ -265,6 +261,7 @@ app.post('/api/order', async (req, res) => {
     return res.status(400).json({ error: 'Champs manquants' });
   }
 
+  // Incrémenter usage promo
   if (promoCode) {
     try {
       const database = await getDB();
@@ -279,6 +276,7 @@ app.post('/api/order', async (req, res) => {
   const itemsList = items.map(i => `• **${i.name}** x${i.qty} — ${i.sub.toLocaleString('fr-FR')}€`).join('\n');
   const promoLine = promoCode ? `\n🏷️ Code promo: **${promoCode}** (-${discount}%)` : '';
 
+  // Sauvegarder la commande côté serveur (MongoDB)
   const order = {
     id: Date.now(),
     pseudo, gang, phone,
@@ -295,6 +293,7 @@ app.post('/api/order', async (req, res) => {
     await database.collection('orders').insertOne(order);
   } catch(e) { console.error('Erreur sauvegarde commande:', e.message); }
 
+  // Envoyer sur Discord Webhook
   const embed = {
     embeds: [{
       title: '🔫 Nouvelle commande Underground',
@@ -329,11 +328,13 @@ app.post('/api/order', async (req, res) => {
 app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) => {
   const { orderId, discordId, pseudo } = req.body;
 
+  // Mettre à jour le statut de la commande (MongoDB)
   try {
     const database = await getDB();
     await database.collection('orders').updateOne({ id: parseInt(orderId) }, { $set: { status: 'done', doneAt: new Date().toISOString() } });
   } catch(e) { console.error('Erreur update order:', e.message); }
 
+  // Envoyer MP Discord si BOT_TOKEN configuré
   if (BOT_TOKEN && discordId) {
     try {
       const dmRes = await axios.post(`https://discord.com/api/v10/users/@me/channels`,
@@ -397,6 +398,9 @@ app.delete('/api/admins/:id', async (req, res) => {
 // =====================
 // API — RÔLES DISCORD (synchro en direct depuis l'API Discord)
 // =====================
+// Cette route interroge directement Discord à chaque appel : pas besoin d'un bot séparé
+// qui tourne en permanence. Dès qu'un rôle est créé/modifié/supprimé sur Discord, il apparaît
+// immédiatement ici au prochain chargement de la page.
 app.get('/api/roles', async (req, res) => {
   if (!BOT_TOKEN || !DISCORD_GUILD_ID) {
     return res.status(400).json({ error: 'BOT_TOKEN ou DISCORD_GUILD_ID manquant dans les variables d\'environnement' });
@@ -405,6 +409,7 @@ app.get('/api/roles', async (req, res) => {
     const rolesRes = await axios.get(`https://discord.com/api/v10/guilds/${DISCORD_GUILD_ID}/roles`, {
       headers: { Authorization: `Bot ${BOT_TOKEN}` }
     });
+    // Liste des permissions Discord les plus courantes, en clair
     const PERMISSION_FLAGS = {
       ADMINISTRATOR: 0x8n,
       MANAGE_GUILD: 0x20n,
