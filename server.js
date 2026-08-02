@@ -553,6 +553,22 @@ app.get('/api/orders/search/:discordId', async (req, res) => {
   res.json(orders);
 });
 
+const fs = require('fs');
+
+// =====================
+// API — IMAGES DE FOND (diaporama automatique)
+// =====================
+// Dépose tes images dans /public/backgrounds/ (JPG, PNG, WEBP)
+// Cette route détecte automatiquement toutes les images présentes, pas besoin de toucher au code.
+app.get('/api/backgrounds', (req, res) => {
+  const dir = path.join(__dirname, 'public', 'backgrounds');
+  try {
+    if (!fs.existsSync(dir)) return res.json([]);
+    const files = fs.readdirSync(dir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
+    res.json(files.map(f => '/backgrounds/' + f));
+  } catch (e) { res.json([]); }
+});
+
 // =====================
 // CATCH ALL
 // =====================
