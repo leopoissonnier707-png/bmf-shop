@@ -1006,11 +1006,25 @@
     const cat=document.getElementById('a-cat').value;
     const price=parseInt(document.getElementById('a-price').value)||0;
     const desc=document.getElementById('a-desc').value.trim();
-    const photos = pendingPhotosB64.filter(Boolean);
+    const currency=document.getElementById('a-currency').value;
+    const localPhotos = pendingPhotosB64.filter(Boolean);
     if (!name||!price) { alert('Remplis le nom et le prix.'); return; }
+    const btn = document.querySelector('.btn-confirm[onclick="addWeapon()"]');
+    let originalText;
+    if (btn) { originalText = btn.textContent; btn.disabled = true; btn.textContent = 'Envoi des photos...'; }
+    // Upload chaque photo vers l'hébergeur externe (pas dans MongoDB) avant de créer l'arme
+    const uploadedUrls = [];
+    for (const photo of localPhotos) {
+      try {
+        const ur = await fetch('/api/upload-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image: photo }) });
+        const ud = await ur.json();
+        if (ud.success) uploadedUrls.push(ud.url);
+      } catch(e) {}
+    }
+    if (btn) btn.textContent = 'Ajout au catalogue...';
     const r = await fetch('/api/weapons', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,cat,price,desc,photos})
+      body: JSON.stringify({name,cat,price,desc,currency,photos: uploadedUrls})
     });
     const d = await r.json();
     if (d.success) {
@@ -1019,7 +1033,10 @@
       document.getElementById('a-photos-preview').innerHTML='';
       ['a-name','a-price','a-desc'].forEach(id=>document.getElementById(id).value='');
       renderAdminWeapons(); renderCatalog(); buildCatFilters();
+    } else {
+      alert(d.error || 'Erreur lors de l\'ajout.');
     }
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
 
   async function delWeapon(id) {
