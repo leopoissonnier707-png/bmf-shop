@@ -301,10 +301,11 @@ app.post('/api/order', async (req, res) => {
 
 app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) => {
   const { orderId, discordId, pseudo } = req.body;
+  const processedBy = req.session.user ? req.session.user.username : 'Underground';
 
   try {
     const database = await getDB();
-    await database.collection('orders').updateOne({ id: parseInt(orderId) }, { $set: { status: 'done', doneAt: new Date().toISOString() } });
+    await database.collection('orders').updateOne({ id: parseInt(orderId) }, { $set: { status: 'done', doneAt: new Date().toISOString(), processedBy } });
   } catch(e) { console.error('Erreur update order:', e.message); }
 
   if (BOT_TOKEN && discordId) {
@@ -319,7 +320,7 @@ app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) 
           embeds: [{
             title: '✅ Votre commande Underground est prête !',
             color: 0x4ade80,
-            description: `Bonjour **${pseudo}** ! 🎮\n\nVotre commande sur **Underground Shop** est prête.\nVous serez contacté **en jeu** très prochainement par un membre du staff pour la livraison.\n\nMerci de votre confiance ! 🔫`,
+            description: `Bonjour **${pseudo}** ! 🎮\n\nVotre commande sur **Underground Shop** est prête.\nTraité par un membre des **Underground** : **${processedBy}**.\nVous serez contacté **en jeu** très prochainement par un membre des **Underground** pour la livraison.\n\nMerci de votre confiance ! 🔫`,
             footer: { text: 'Underground Black Market · RP FiveM' },
             timestamp: new Date().toISOString()
           }]
