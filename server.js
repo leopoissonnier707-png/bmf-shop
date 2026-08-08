@@ -18,6 +18,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'undergroundsecret2024';
 const REDIRECT_URL = process.env.REDIRECT_URL || `http://localhost:${PORT}/auth/callback`;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY; // hébergement gratuit des photos, pour ne pas remplir MongoDB
 
 const { MongoClient } = require('mongodb');
 const MONGO_URI = process.env.MONGO_URI;
@@ -151,6 +152,26 @@ app.get('/api/me', async (req, res) => {
     res.json({ user: req.session.user, isAdmin: req.session.isAdmin });
   } else {
     res.json({ user: null, isAdmin: false });
+  }
+});
+
+// =====================
+// API — UPLOAD PHOTOS (hébergées gratuitement sur imgbb, pas dans MongoDB)
+// =====================
+app.post('/api/upload-image', requirePermission('manageWeapons'), async (req, res) => {
+  if (!IMGBB_API_KEY) return res.status(400).json({ error: 'IMGBB_API_KEY manquante sur le serveur' });
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ error: 'Image manquante' });
+  try {
+    const base64Data = image.split(',')[1] || image; // retire le préfixe data:image/...;base64,
+    const params = new URLSearchParams();
+    params.append('key', IMGBB_API_KEY);
+    params.append('image', base64Data);
+    const uploadRes = await axios.post('https://api.imgbb.com/1/upload', params);
+    res.json({ success: true, url: uploadRes.data.data.url });
+  } catch (err) {
+    console.error('Erreur upload imgbb:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Erreur upload photo' });
   }
 });
 
