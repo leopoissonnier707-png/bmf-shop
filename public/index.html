@@ -339,8 +339,9 @@
     <button class="nav-btn" onclick="showPage('order')">
       Commande <span id="cart-badge" class="cart-badge" style="display:none">0</span>
     </button>
-    <button class="nav-btn" onclick="showPage('roles')">Rôles</button>
-    <button class="nav-btn" onclick="goAdmin()">Admin</button>
+    <button class="nav-btn" id="nav-absence" onclick="showPage('absence')" style="display:none">Absence</button>
+    <button class="nav-btn" id="nav-roles" onclick="showPage('roles')">Rôles</button>
+    <button class="nav-btn" id="nav-admin" onclick="goAdmin()">Admin</button>
     <div id="auth-area"></div>
   </div>
 </div>
@@ -460,6 +461,33 @@
   </div>
 </div>
 
+<!-- ABSENCE -->
+<div id="page-absence" class="page">
+  <div class="order-wrap">
+    <div class="section-title">Déclarer une absence</div>
+    <div class="section-sub">// Renseigne tes infos, ça sera posté/mis à jour automatiquement sur Discord</div>
+    <div class="form-box">
+      <div class="form-box-title">Informations</div>
+      <div class="form-grid">
+        <div class="field full"><label>Nom / prénom illégal (RP) <span class="req">*</span></label><input type="text" id="abs-rpname" placeholder="Tony Montana"></div>
+        <div class="field"><label>Absent à partir de <span class="req">*</span></label><input type="datetime-local" id="abs-from"></div>
+        <div class="field"><label>Jusqu'à <span class="req">*</span></label><input type="datetime-local" id="abs-to"></div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-title">Signature <span class="req">* obligatoire</span></div>
+        <canvas class="signature-area" id="abs-sig-canvas" width="560" height="100"></canvas>
+        <button class="signature-clear" onclick="clearAbsSignature()">✕ Effacer</button>
+      </div>
+      <div class="cgu-wrap">
+        <input type="checkbox" id="abs-cgu">
+        <label for="abs-cgu">Je confirme l'exactitude de ces informations et je m'engage à prévenir en cas de changement.</label>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="submitAbsence()" id="abs-submit-btn">📋 Envoyer mon absence</button>
+    <div id="abs-history" style="margin-top:24px"></div>
+  </div>
+</div>
+
 <!-- DENIED -->
 <div id="page-denied" class="page">
   <div class="denied-wrap">
@@ -557,6 +585,10 @@
     } else {
       area.innerHTML = `<a href="/auth/discord"><button class="nav-btn discord-btn">🎮 Discord</button></a>`;
     }
+    const canAdmin = isAdmin || myPermissions.accessAdmin;
+    document.getElementById('nav-admin').style.display = canAdmin ? '' : 'none';
+    document.getElementById('nav-roles').style.display = canAdmin ? '' : 'none';
+    document.getElementById('nav-absence').style.display = (isAdmin || myPermissions.accessAbsence) ? '' : 'none';
   }
 
   function avatarUrl(u) {
@@ -574,6 +606,7 @@
     if (name === 'order') renderOrderPage();
     if (name === 'shop') renderCatalog();
     if (name === 'roles') loadRoles();
+    if (name === 'absence') renderAbsencePage();
   }
 
   function goAdmin() {
