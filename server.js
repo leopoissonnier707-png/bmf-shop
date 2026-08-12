@@ -176,6 +176,33 @@ app.post('/api/upload-image', requirePermission('manageWeapons'), async (req, re
   }
 });
 
+app.get('/api/categories', async (req, res) => {
+  const database = await getDB();
+  let cats = await database.collection('categories').find({}).toArray();
+  if (!cats.length) {
+    const defaults = ['Pistolet','Fusil','Sniper','Explosif','Couteau','Drogue','Autre'];
+    await database.collection('categories').insertMany(defaults.map(name => ({ name })));
+    cats = defaults.map(name => ({ name }));
+  }
+  res.json(cats.map(c => c.name));
+});
+
+app.post('/api/categories', requirePermission('manageWeapons'), async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Nom manquant' });
+  const database = await getDB();
+  const exists = await database.collection('categories').findOne({ name: name.trim() });
+  if (exists) return res.status(400).json({ error: 'Catégorie déjà existante' });
+  await database.collection('categories').insertOne({ name: name.trim() });
+  res.json({ success: true });
+});
+
+app.delete('/api/categories/:name', requirePermission('deleteItems'), async (req, res) => {
+  const database = await getDB();
+  await database.collection('categories').deleteOne({ name: req.params.name });
+  res.json({ success: true });
+});
+
 app.get('/api/weapons', async (req, res) => {
   res.json(await readJSON('weapons', []));
 });
@@ -544,6 +571,66 @@ app.get('/api/orders/search/:discordId', async (req, res) => {
 // =====================
 // Chaque personne a UN SEUL message dans le salon d'absence. Si elle poste une nouvelle
 // absence, ce message existant est mis à jour (édité) au lieu d'en créer un nouveau.
+async function rebuildAbsenceMessage(discordId) {
+  const database = await getDB();
+  const user = (await database.collection('absences').findOne({ discordId }))?.discordUser;
+  const allEntries = await database.collection('absences').find({ discordId }).sort({ createdAt: -1 }).toArray();
+  const existing = await database.collection('absenceMessages').findOne({ discordId });
+
+  if (!allEntries.length) {
+    // Plus aucune absence : on supprime le post Discord s'il existe
+    if (existing && existing.messageId && BOT_TOKEN && ABSENCE_CHANNEL_ID) {
+      try {
+        await axios.delete(`https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages/${existing.messageId}`,
+          { headers: { Authorization: `Bot ${BOT_TOKEN}` } });
+      } catch(e) {}
+    }
+    if (existing) await database.collection('absenceMessages').deleteOne({ discordId });
+    return;
+  }
+  if (!BOT_TOKEN || !ABSENCE_CHANNEL_ID || !user) return;
+
+  // Nom affiché sur le serveur Discord (pseudo serveur), pas le nom de compte global
+  let displayName = user.username;
+  try {
+    const memberRes = await axios.get(`https://discord.com/api/v10/guilds/${DISCORD_GUILD_ID}/members/${discordId}`, {
+      headers: { Authorization: `Bot ${BOT_TOKEN}` }
+    });
+    displayName = memberRes.data.nick || memberRes.data.user?.global_name || user.username;
+  } catch(e) {}
+
+  const avatarUrl = user.avatar
+    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+    : `https://cdn.discordapp.com/embed/avatars/0.png`;
+
+  const listText = allEntries.map(e =>
+    `📌 **${e.rpName}**\n🕒 Du **${new Date(e.from).toLocaleString('fr-FR')}** au **${new Date(e.to).toLocaleString('fr-FR')}**\nRenseigné le ${new Date(e.createdAt).toLocaleDateString('fr-FR')}`
+  ).join('\n\n');
+
+  const embed = {
+    embeds: [{
+      title: `📋 Absences — ${displayName}`,
+      color: 0xfbbf24,
+      thumbnail: { url: avatarUrl },
+      description: listText,
+      footer: { text: `Discord ID: ${discordId}` },
+      timestamp: new Date().toISOString()
+    }],
+    content: `<@${discordId}> a mis à jour ses absences.`
+  };
+
+  if (existing && existing.messageId) {
+    try {
+      await axios.patch(`https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages/${existing.messageId}`, embed,
+        { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } });
+      return;
+    } catch(e) { /* message supprimé côté Discord, on en recrée un */ }
+  }
+  const msgRes = await axios.post(`https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages`, embed,
+    { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } });
+  await database.collection('absenceMessages').updateOne({ discordId }, { $set: { messageId: msgRes.data.id } }, { upsert: true });
+}
+
 app.post('/api/absence', requirePermission('accessAbsence'), async (req, res) => {
   const { rpName, from, to } = req.body;
   const user = req.session.user;
@@ -551,71 +638,44 @@ app.post('/api/absence', requirePermission('accessAbsence'), async (req, res) =>
   if (!BOT_TOKEN || !ABSENCE_CHANNEL_ID) return res.status(400).json({ error: 'BOT_TOKEN ou ABSENCE_CHANNEL_ID manquant' });
 
   const database = await getDB();
-  const entry = { rpName, from, to, createdAt: new Date().toISOString() };
-
   try {
-    await database.collection('absences').insertOne({
-      discordId: user.id, discordUser: user, rpName, from, to, createdAt: entry.createdAt
+    const result = await database.collection('absences').insertOne({
+      discordId: user.id, discordUser: user, rpName, from, to, createdAt: new Date().toISOString()
     });
-
-    // Récupère toutes les absences de cette personne pour reconstruire le message complet
-    const allEntries = await database.collection('absences')
-      .find({ discordId: user.id }).sort({ createdAt: -1 }).toArray();
-
-    const avatarUrl = user.avatar
-      ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-      : `https://cdn.discordapp.com/embed/avatars/0.png`;
-
-    const listText = allEntries.map(e =>
-      `📌 **${e.rpName}**\n🕒 Du **${new Date(e.from).toLocaleString('fr-FR')}** au **${new Date(e.to).toLocaleString('fr-FR')}**\nRenseigné le ${new Date(e.createdAt).toLocaleDateString('fr-FR')}`
-    ).join('\n\n');
-
-    const embed = {
-      embeds: [{
-        title: `📋 Absences — ${user.username}`,
-        color: 0xfbbf24,
-        thumbnail: { url: avatarUrl },
-        description: listText,
-        footer: { text: `Discord ID: ${user.id}` },
-        timestamp: new Date().toISOString()
-      }],
-      content: `<@${user.id}> a renseigné une absence.`
-    };
-
-    const existing = await database.collection('absenceMessages').findOne({ discordId: user.id });
-
-    if (existing && existing.messageId) {
-      try {
-        await axios.patch(
-          `https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages/${existing.messageId}`,
-          embed,
-          { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
-        );
-      } catch (editErr) {
-        // Si le message a été supprimé côté Discord, on en recrée un nouveau
-        const msgRes = await axios.post(
-          `https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages`,
-          embed,
-          { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
-        );
-        await database.collection('absenceMessages').updateOne(
-          { discordId: user.id }, { $set: { messageId: msgRes.data.id } }, { upsert: true }
-        );
-      }
-    } else {
-      const msgRes = await axios.post(
-        `https://discord.com/api/v10/channels/${ABSENCE_CHANNEL_ID}/messages`,
-        embed,
-        { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
-      );
-      await database.collection('absenceMessages').insertOne({ discordId: user.id, messageId: msgRes.data.id });
-    }
-
-    res.json({ success: true });
+    await rebuildAbsenceMessage(user.id);
+    res.json({ success: true, id: result.insertedId });
   } catch (err) {
     console.error('Erreur absence:', err.response?.data || err.message);
     res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'absence' });
   }
+});
+
+// Modifier une absence existante (uniquement la sienne, sauf pour un admin complet)
+app.put('/api/absence/:id', requirePermission('accessAbsence'), async (req, res) => {
+  const { ObjectId } = require('mongodb');
+  const database = await getDB();
+  const entry = await database.collection('absences').findOne({ _id: new ObjectId(req.params.id) });
+  if (!entry) return res.status(404).json({ error: 'Absence introuvable' });
+  if (entry.discordId !== req.session.user.id && !req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
+  const { rpName, from, to } = req.body;
+  await database.collection('absences').updateOne(
+    { _id: new ObjectId(req.params.id) },
+    { $set: { rpName: rpName || entry.rpName, from: from || entry.from, to: to || entry.to } }
+  );
+  await rebuildAbsenceMessage(entry.discordId);
+  res.json({ success: true });
+});
+
+// Annuler / supprimer une absence (uniquement la sienne, sauf pour un admin complet)
+app.delete('/api/absence/:id', requirePermission('accessAbsence'), async (req, res) => {
+  const { ObjectId } = require('mongodb');
+  const database = await getDB();
+  const entry = await database.collection('absences').findOne({ _id: new ObjectId(req.params.id) });
+  if (!entry) return res.status(404).json({ error: 'Absence introuvable' });
+  if (entry.discordId !== req.session.user.id && !req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
+  await database.collection('absences').deleteOne({ _id: new ObjectId(req.params.id) });
+  await rebuildAbsenceMessage(entry.discordId);
+  res.json({ success: true });
 });
 
 app.get('/api/absence/mine', requirePermission('accessAbsence'), async (req, res) => {
