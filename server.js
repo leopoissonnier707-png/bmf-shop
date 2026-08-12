@@ -20,6 +20,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY; // hébergement gratuit des photos, pour ne pas remplir MongoDB
 const ABSENCE_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID; // salon Discord où postent les absences
+const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID; // salon Discord où arrivent tous les logs d'actions
 
 const { MongoClient } = require('mongodb');
 const MONGO_URI = process.env.MONGO_URI;
@@ -72,6 +73,31 @@ async function isUserBanned(userId) {
     return true; // 200 = banni
   } catch (e) {
     return false; // 404 = pas banni
+  }
+}
+
+// =====================
+// SYSTÈME DE LOGS — envoie chaque action importante dans un salon Discord dédié
+// =====================
+async function sendLog(action, description, user, color = 0xcda349) {
+  if (!BOT_TOKEN || !LOGS_CHANNEL_ID) return;
+  try {
+    const who = user ? `<@${user.id}> (${user.username})` : 'Système';
+    await axios.post(
+      `https://discord.com/api/v10/channels/${LOGS_CHANNEL_ID}/messages`,
+      {
+        embeds: [{
+          title: `📝 ${action}`,
+          description,
+          color,
+          fields: [{ name: 'Par', value: who, inline: true }],
+          timestamp: new Date().toISOString()
+        }]
+      },
+      { headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('Erreur envoi log:', err.response?.data || err.message);
   }
 }
 
@@ -194,12 +220,14 @@ app.post('/api/categories', requirePermission('manageWeapons'), async (req, res)
   const exists = await database.collection('categories').findOne({ name: name.trim() });
   if (exists) return res.status(400).json({ error: 'Catégorie déjà existante' });
   await database.collection('categories').insertOne({ name: name.trim() });
+  sendLog('Catégorie créée', `**${name.trim()}**`, req.session.user, 0x7fae70);
   res.json({ success: true });
 });
 
 app.delete('/api/categories/:name', requirePermission('deleteItems'), async (req, res) => {
   const database = await getDB();
   await database.collection('categories').deleteOne({ name: req.params.name });
+  sendLog('Catégorie supprimée', `**${req.params.name}**`, req.session.user, 0xb3394c);
   res.json({ success: true });
 });
 
@@ -214,6 +242,7 @@ app.post('/api/weapons', requirePermission('manageWeapons'), async (req, res) =>
   try {
     const database = await getDB();
     await database.collection('weapons').insertOne(weapon);
+    sendLog('Article ajouté au catalogue', `**${weapon.name}** (${weapon.cat}) — ${weapon.price.toLocaleString('fr-FR')}€`, req.session.user, 0x7fae70);
     res.json({ success: true, weapon });
   } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
@@ -223,6 +252,7 @@ app.put('/api/weapons/:id', requirePermission('manageWeapons'), async (req, res)
     const database = await getDB();
     const { _id, ...update } = req.body;
     await database.collection('weapons').updateOne({ id: parseInt(req.params.id) }, { $set: update });
+    sendLog('Article modifié', `**${update.name || req.params.id}** a été modifié dans le catalogue`, req.session.user, 0xcda349);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
@@ -230,7 +260,9 @@ app.put('/api/weapons/:id', requirePermission('manageWeapons'), async (req, res)
 app.delete('/api/weapons/:id', requirePermission('deleteItems'), async (req, res) => {
   try {
     const database = await getDB();
+    const weapon = await database.collection('weapons').findOne({ id: parseInt(req.params.id) });
     await database.collection('weapons').deleteOne({ id: parseInt(req.params.id) });
+    sendLog('Article supprimé du catalogue', `**${weapon?.name || req.params.id}** a été supprimé`, req.session.user, 0xb3394c);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: 'Erreur DB' }); }
 });
@@ -249,12 +281,14 @@ app.post('/api/promos', requirePermission('managePromos'), async (req, res) => {
   if (exists) return res.status(400).json({ error: 'Code déjà existant' });
   const promo = { code: code.toUpperCase(), discount: parseInt(discount), active: true, usages: 0, createdAt: new Date().toISOString() };
   await database.collection('promos').insertOne(promo);
+  sendLog('Code promo créé', `**${promo.code}** — ${promo.discount}%`, req.session.user, 0x7fae70);
   res.json({ success: true, promo });
 });
 
 app.delete('/api/promos/:code', requirePermission('managePromos'), async (req, res) => {
   const database = await getDB();
   await database.collection('promos').deleteOne({ code: req.params.code });
+  sendLog('Code promo supprimé', `**${req.params.code}**`, req.session.user, 0xb3394c);
   res.json({ success: true });
 });
 
@@ -319,7 +353,7 @@ app.post('/api/order', async (req, res) => {
 
   const embed = {
     embeds: [{
-      title: '🔫 Nouvelle commande Underground',
+      title: '🔫 Nouvelle commande — Famille Hoffman',
       color: 0x00d4c8,
       thumbnail: { url: avatarUrl },
       fields: [
@@ -333,7 +367,7 @@ app.post('/api/order', async (req, res) => {
         { name: '🆔 Discord ID', value: user.id, inline: true },
         { name: '🔖 ID Commande', value: `#${order.id}`, inline: true }
       ],
-      footer: { text: `Underground Shop · Commande #${order.id} · EN ATTENTE` },
+      footer: { text: `Famille Hoffman · Commande #${order.id} · EN ATTENTE` },
       timestamp: new Date().toISOString()
     }],
     content: `📦 **Nouvelle commande** de ${user.username} | ID: \`${order.id}\``
@@ -345,12 +379,13 @@ app.post('/api/order', async (req, res) => {
     console.error('Erreur webhook:', err.response?.data || err.message);
   }
 
+  sendLog('Nouvel achat', `${itemsList} — Total: **${total.toLocaleString('fr-FR')}€**`, user, 0xcda349);
   res.json({ success: true, orderId: order.id });
 });
 
 app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) => {
   const { orderId, discordId, pseudo } = req.body;
-  const processedBy = req.session.user ? req.session.user.username : 'Underground';
+  const processedBy = req.session.user ? req.session.user.username : 'la Famille';
 
   try {
     const database = await getDB();
@@ -367,10 +402,10 @@ app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) 
       await axios.post(`https://discord.com/api/v10/channels/${channelId}/messages`,
         {
           embeds: [{
-            title: '✅ Votre commande Underground est prête !',
+            title: '✅ Votre commande auprès de la Famille Hoffman est prête !',
             color: 0x4ade80,
-            description: `Bonjour **${pseudo}** ! 🎮\n\nVotre commande sur **Underground Shop** est prête.\nTraité par un membre des **Underground** : **${processedBy}**.\nVous serez contacté **en jeu** très prochainement par un membre des **Underground** pour la livraison.\n\nMerci de votre confiance ! 🔫`,
-            footer: { text: 'Underground Black Market · RP FiveM' },
+            description: `Bonjour **${pseudo}** ! 🎭\n\nVotre commande auprès de la **Famille Hoffman** est prête.\nTraité par : **${processedBy}**.\nVous serez contacté **en personne** très prochainement pour la remise.\n\nQue la fortune vous sourie. 🃏`,
+            footer: { text: 'Famille Hoffman · RP FiveM' },
             timestamp: new Date().toISOString()
           }]
         },
@@ -381,6 +416,7 @@ app.post('/api/order/done', requirePermission('manageOrders'), async (req, res) 
     }
   }
 
+  sendLog('Commande validée', `Commande **#${orderId}** de **${pseudo}** marquée comme prête`, req.session.user, 0x7fae70);
   res.json({ success: true });
 });
 
@@ -392,6 +428,7 @@ app.delete('/api/order/:id', requirePermission('manageOrders'), async (req, res)
     { id: parseInt(req.params.id) },
     { $set: { deleted: true, deletedAt: new Date().toISOString() } }
   );
+  sendLog('Commande supprimée', `Commande **#${req.params.id}** supprimée (reste consultable via la recherche)`, req.session.user, 0xb3394c);
   res.json({ success: true });
 });
 
@@ -409,6 +446,7 @@ app.post('/api/admins', async (req, res) => {
   const exists = await database.collection('admins').findOne({ id });
   if (exists) return res.status(400).json({ error: 'Admin déjà existant' });
   await database.collection('admins').insertOne({ id, note: note || '', addedAt: new Date().toISOString() });
+  sendLog('Nouvel admin ajouté', `ID Discord : **${id}**${note ? ` — ${note}` : ''}`, req.session.user, 0x7fae70);
   res.json({ success: true });
 });
 
@@ -416,6 +454,7 @@ app.delete('/api/admins/:id', async (req, res) => {
   if (!req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
   const database = await getDB();
   await database.collection('admins').deleteOne({ id: req.params.id });
+  sendLog('Admin retiré', `ID Discord : **${req.params.id}**`, req.session.user, 0xb3394c);
   res.json({ success: true });
 });
 
@@ -530,6 +569,7 @@ app.post('/api/role-permissions', async (req, res) => {
     { $set: { roleId, roleName, accessAdmin: !!accessAdmin, manageWeapons: !!manageWeapons, manageOrders: !!manageOrders, managePromos: !!managePromos, deleteItems: !!deleteItems, accessAbsence: !!accessAbsence } },
     { upsert: true }
   );
+  sendLog('Permissions de rôle modifiées', `Rôle **${roleName || roleId}** mis à jour`, req.session.user, 0xcda349);
   res.json({ success: true });
 });
 
@@ -643,6 +683,7 @@ app.post('/api/absence', requirePermission('accessAbsence'), async (req, res) =>
       discordId: user.id, discordUser: user, rpName, from, to, createdAt: new Date().toISOString()
     });
     await rebuildAbsenceMessage(user.id);
+    sendLog('Absence déclarée', `**${rpName}** — du ${new Date(from).toLocaleString('fr-FR')} au ${new Date(to).toLocaleString('fr-FR')}`, user, 0xcda349);
     res.json({ success: true, id: result.insertedId });
   } catch (err) {
     console.error('Erreur absence:', err.response?.data || err.message);
@@ -663,6 +704,7 @@ app.put('/api/absence/:id', requirePermission('accessAbsence'), async (req, res)
     { $set: { rpName: rpName || entry.rpName, from: from || entry.from, to: to || entry.to } }
   );
   await rebuildAbsenceMessage(entry.discordId);
+  sendLog('Absence modifiée', `Absence de **${rpName || entry.rpName}** modifiée`, req.session.user, 0xcda349);
   res.json({ success: true });
 });
 
@@ -675,6 +717,7 @@ app.delete('/api/absence/:id', requirePermission('accessAbsence'), async (req, r
   if (entry.discordId !== req.session.user.id && !req.session.isAdmin) return res.status(403).json({ error: 'Non autorisé' });
   await database.collection('absences').deleteOne({ _id: new ObjectId(req.params.id) });
   await rebuildAbsenceMessage(entry.discordId);
+  sendLog('Absence annulée', `Absence de **${entry.rpName}** annulée`, req.session.user, 0xb3394c);
   res.json({ success: true });
 });
 
@@ -710,7 +753,7 @@ app.get('*', (req, res) => {
 
 initDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`Underground Shop démarré sur le port ${PORT}`);
+    console.log(`Famille Hoffman démarré sur le port ${PORT}`);
   });
 }).catch(err => {
   console.error('Erreur au démarrage :', err);
