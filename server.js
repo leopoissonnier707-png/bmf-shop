@@ -734,13 +734,32 @@ app.get('/api/absence/all', requirePermission('accessAbsence'), async (req, res)
   res.json(all);
 });
 
-app.get('/api/backgrounds', (req, res) => {
-  const dir = path.join(__dirname, 'public', 'backgrounds');
+// =====================
+// API — IMAGES DE FOND (gérées par lien, depuis le panel admin)
+// =====================
+app.get('/api/backgrounds', async (req, res) => {
   try {
-    if (!fs.existsSync(dir)) return res.json([]);
-    const files = fs.readdirSync(dir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-    res.json(files.map(f => '/backgrounds/' + f));
+    const database = await getDB();
+    const list = await database.collection('backgrounds').find({}).toArray();
+    res.json(list.map(b => ({ id: b._id, url: b.url })));
   } catch (e) { res.json([]); }
+});
+
+app.post('/api/backgrounds', requirePermission('manageWeapons'), async (req, res) => {
+  const { url } = req.body;
+  if (!url || !url.trim()) return res.status(400).json({ error: 'Lien manquant' });
+  const database = await getDB();
+  const result = await database.collection('backgrounds').insertOne({ url: url.trim(), addedAt: new Date().toISOString() });
+  sendLog('Photo de fond ajoutée', url.trim(), req.session.user, 0x7fae70);
+  res.json({ success: true, id: result.insertedId });
+});
+
+app.delete('/api/backgrounds/:id', requirePermission('deleteItems'), async (req, res) => {
+  const { ObjectId } = require('mongodb');
+  const database = await getDB();
+  await database.collection('backgrounds').deleteOne({ _id: new ObjectId(req.params.id) });
+  sendLog('Photo de fond supprimée', `ID: ${req.params.id}`, req.session.user, 0xb3394c);
+  res.json({ success: true });
 });
 
 app.get('/ping', (req, res) => {
