@@ -102,7 +102,7 @@ async function sendLog(action, description, user, color = 0xcda349) {
 }
 
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
@@ -767,6 +767,7 @@ app.get('/ping', (req, res) => {
 });
 
 app.get('*', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
