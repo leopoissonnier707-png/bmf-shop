@@ -31,9 +31,7 @@
     }
 
     /* ============ FOND ORNEMENTAL (aucune photo) ============ */
-    .bg-slideshow { position: fixed; inset: 0; z-index: -3; overflow: hidden; background: var(--bg); }
-    .bg-slideshow img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 2.8s ease-in-out; filter: saturate(1.05) brightness(0.5) sepia(0.15); }
-    .bg-slideshow img.active { opacity: 1; }
+    .bg-slideshow { display: none; }
     .bg-overlay {
       position: fixed; inset: 0; z-index: -2;
       background:
@@ -434,15 +432,6 @@
         <button class="btn-confirm" onclick="addWeapon()">+ Ajouter au catalogue</button>
       </div>
       <div id="admin-weapon-list"></div>
-
-      <div class="add-form" style="margin-top:20px">
-        <div class="add-form-title">🖼️ Photos de fond du site</div>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="bg-url-input" placeholder="Colle un lien d'image (https://...)" style="flex:1;padding:10px 12px;background:rgba(205,163,73,0.02);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;border-radius:7px">
-          <button class="btn-confirm" style="margin-top:0" onclick="addBackground()">Ajouter</button>
-        </div>
-        <div id="bg-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>
-      </div>
     </div>
     <div id="tab-promos" style="display:none">
       <div class="add-form" id="add-promo-form-box">
@@ -537,32 +526,8 @@
   function fmt(n) { return Number(n).toLocaleString('fr-FR') + '€'; }
   function totalPrice(w) { return w.price; }
 
-  // =================== DIAPORAMA DE FOND (photos par lien, gérées en admin) ===================
-  async function initBackgroundSlideshow() {
-    try {
-      const r = await fetch('/api/backgrounds');
-      const list = await r.json();
-      const container = document.getElementById('bg-slideshow');
-      container.innerHTML = '';
-      if (!list.length) return;
-      list.forEach((b, i) => {
-        const img = document.createElement('img');
-        img.src = b.url;
-        if (i === 0) img.classList.add('active');
-        container.appendChild(img);
-      });
-      if (list.length > 1) {
-        let idx = 0;
-        setInterval(() => {
-          const imgs = container.querySelectorAll('img');
-          if (!imgs.length) return;
-          imgs[idx].classList.remove('active');
-          idx = (idx + 1) % imgs.length;
-          imgs[idx].classList.add('active');
-        }, 7000);
-      }
-    } catch(e) {}
-  }
+  // =================== FOND ORNEMENTAL (pas d'images) ===================
+  function initBackgroundSlideshow() { /* fond géré entièrement en CSS pour ce thème */ }
 
   // =================== AUTH ===================
   async function loadUser() {
@@ -914,7 +879,7 @@
     const tabMap = {orders:0,weapons:1,promos:2};
     document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===tabMap[tab]));
     if (tab==='orders') loadAdminOrders();
-    if (tab==='weapons') { loadAdminWeapons(); loadCategories(); loadBackgroundsList(); }
+    if (tab==='weapons') { loadAdminWeapons(); loadCategories(); }
     if (tab==='promos') loadAdminPromos();
   }
 
@@ -1389,39 +1354,6 @@
       </div>
     </div>`;
     document.body.appendChild(overlay);
-  }
-
-  async function loadBackgroundsList() {
-    const el = document.getElementById('bg-list');
-    if (!el) return;
-    try {
-      const r = await fetch('/api/backgrounds');
-      const list = await r.json();
-      el.innerHTML = list.length ? list.map(b => `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(205,163,73,0.03);border:1px solid var(--border);border-radius:8px">
-        <img src="${b.url}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">
-        <div style="flex:1;font-size:11px;color:var(--muted);word-break:break-all">${b.url}</div>
-        <button class="aw-del" onclick="delBackground('${b.id}')">Supprimer</button>
-      </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">Aucune photo de fond ajoutée.</div>';
-    } catch(e) {}
-  }
-
-  async function addBackground() {
-    const url = document.getElementById('bg-url-input').value.trim();
-    if (!url) return;
-    const r = await fetch('/api/backgrounds', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
-    const d = await r.json();
-    if (d.success) {
-      document.getElementById('bg-url-input').value = '';
-      loadBackgroundsList();
-      initBackgroundSlideshow();
-    } else { alert(d.error || 'Erreur'); }
-  }
-
-  async function delBackground(id) {
-    if (!confirm('Supprimer cette photo de fond ?')) return;
-    await fetch('/api/backgrounds/' + id, { method:'DELETE' });
-    loadBackgroundsList();
-    initBackgroundSlideshow();
   }
 
   // ROLES
