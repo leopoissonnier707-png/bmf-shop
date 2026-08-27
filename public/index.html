@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Famille Hoffman — Black Market RP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --teal: #00e5d4;
+      --teal2: #00b8a9;
+      --teal-rgb: 0,229,212;
+      --bg: #03050a;
+      --bg2: #0a0f18;
+      --bg3: #0d1320;
+      --text: #f0f4fa;
+      --muted: #8b97ab;
+      --green: #34d399;
+      --red: #f87171;
+      --amber: #fbbf24;
+      --border: rgba(0,229,212,0.14);
+      --border2: rgba(0,229,212,0.28);
+      --card: rgba(12,18,30,0.72);
+      --card2: rgba(16,24,40,0.8);
+      --glass-blur: blur(20px) saturate(160%);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow: 0 12px 40px rgba(0,0,0,0.5);
+      --shadow-glow: 0 0 0 1px rgba(0,229,212,0.18), 0 16px 48px rgba(0,229,212,0.1);
+      --glow-alpha: 0.3;
+      --card-min-width: 220px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ============ FOND DIAPORAMA ============ */
+    .bg-slideshow { position: fixed; inset: 0; z-index: -3; overflow: hidden; background: var(--bg); }
+    .bg-slideshow img {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      opacity: 0; transition: opacity 3s ease-in-out; filter: saturate(1.15) brightness(0.55) contrast(1.05);
+    }
+    .bg-slideshow img.active { opacity: 1; }
+    .bg-overlay {
+      position: fixed; inset: 0; z-index: -2;
+      background:
+        radial-gradient(ellipse 80% 50% at 15% 10%, rgba(0,229,212,0.07) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 90% 80%, rgba(0,184,169,0.05) 0%, transparent 50%),
+        linear-gradient(180deg, #020308 0%, #05070c 40%, #010204 100%);
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,229,212,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,212,0.015) 1px, transparent 1px);
+      background-size: 56px 56px;
+      animation: gridmove 40s linear infinite;
+    }
+    @keyframes gridmove { 0% { background-position: 0 0; } 100% { background-position: 56px 56px; } }
+    .topbar, .page, #page-shop, #page-order, #page-success, #page-admin, #page-denied { position: relative; z-index: 1; }
+
+    /* ============ TIROIR DE NAVIGATION ============ */
+    .hamburger-btn {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text);
+      width: 40px; height: 40px; border-radius: 12px; font-size: 18px; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hamburger-btn:hover { border-color: var(--border2); color: var(--teal); background: rgba(0,229,212,0.08); }
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 290;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+    .sidebar-drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 260px; z-index: 300;
+      background: linear-gradient(180deg, #070b12 0%, #04060c 100%);
+      border-right: 1px solid rgba(255,255,255,0.06);
+      display: flex; flex-direction: column;
+      transform: translateX(-100%); transition: transform 0.3s cubic-bezier(.2,.9,.3,1);
+    }
+    .sidebar-drawer.open { transform: translateX(0); box-shadow: 24px 0 80px rgba(0,0,0,0.6); }
+    .drawer-header { display: flex; align-items: center; gap: 12px; padding: 22px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .drawer-nav { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; flex: 1; overflow-y: auto; }
+    .drawer-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: transparent; border: none;
+      color: var(--muted); font-family: 'Rajdhani', sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: 0.02em;
+      text-align: left; cursor: pointer; border-radius: 12px; transition: all 0.2s;
+    }
+    .drawer-item span:first-of-type { flex: 1; }
+    .drawer-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .drawer-item.active { background: rgba(0,229,212,0.12); color: var(--teal); box-shadow: inset 3px 0 0 var(--teal); }
+    .drawer-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .drawer-footer .discord-btn-full { width: 100%; justify-content: center; }
+    body.drawer-locked { overflow: hidden; }
+
+    /* Barre du haut simplifiée */
+    .topbar { justify-content: space-between; }
+
+    ::selection { background: rgba(0,229,212,0.3); }
+
+    /* ============ TOPBAR ============ */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 64px;
+      background: rgba(6,10,18,0.78); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 200;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 12px; cursor: pointer; transition: transform 0.2s; }
+    .logo-wrap:hover { transform: scale(1.02); }
+    .logo-badge {
+      background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f;
+      font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 800; padding: 7px 16px;
+      letter-spacing: 0.12em; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,229,212,0.35);
+    }
+    .logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; font-family: 'Share Tech Mono', monospace; }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      font-family: 'Rajdhani', sans-serif; font-size: 12.5px; font-weight: 600; padding: 9px 16px;
+      border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--muted);
+      cursor: pointer; transition: all 0.25s cubic-bezier(.2,.9,.3,1); letter-spacing: 0.04em;
+      text-transform: uppercase; border-radius: 999px;
+    }
+    .nav-btn:hover { color: var(--teal); border-color: var(--border2); background: rgba(0,229,212,0.08); transform: translateY(-1px); }
+    .nav-btn.active { color: #03120f; background: linear-gradient(135deg, var(--teal), var(--teal2)); border-color: transparent; box-shadow: 0 6px 22px rgba(0,229,212,0.35); }
+    .nav-btn.discord-btn { background: #5865F2; color: #fff; border-color: #5865F2; font-weight: 700; }
+    .nav-btn.discord-btn:hover { opacity: 0.92; background: #5865F2; color: #fff; transform: translateY(-1px); }
+    .cart-badge { background: var(--red); color: #fff; border-radius: 999px; min-width: 16px; height: 16px; padding: 0 5px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
+    .user-info { display: flex; align-items: center; gap: 10px; }
+    .user-avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--teal); box-shadow: 0 0 14px rgba(0,229,212,0.4); }
+    .user-name { font-size: 13px; font-weight: 600; font-family: 'Rajdhani', sans-serif; }
+    .logout-btn { font-size: 11px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+
+    /* PAGES */
+    .page { display: none; animation: fadein 0.35s ease; }
+    .page.active { display: block; }
+    @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    /* ============ SHOP ============ */
+    .shop-header { padding: 40px 24px 20px; }
+    .shop-title {
+      font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 800; letter-spacing: 0.03em;
+      background: linear-gradient(135deg, #fff 15%, var(--teal) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .shop-sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; font-family: 'Share Tech Mono', monospace; }
+    .cat-filters { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+    .cat-btn {
+      font-size: 11.5px; padding: 7px 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
+      color: var(--muted); cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: 0.06em;
+      transition: all 0.2s; border-radius: 999px;
+    }
+    .cat-btn:hover, .cat-btn.active { background: linear-gradient(135deg, rgba(0,229,212,0.2), rgba(0,184,169,0.1)); color: var(--teal); border-color: var(--border2); }
+    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width, 220px), 1fr)); gap: 18px; padding: 20px 24px 40px; }
+    .weapon-card {
+      background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); overflow: hidden; cursor: pointer;
+      transition: transform 0.3s cubic-bezier(.2,.9,.3,1), box-shadow 0.3s, border-color 0.3s; box-shadow: var(--shadow);
+    }
+    .weapon-card:hover { border-color: var(--border2); transform: translateY(-6px); box-shadow: var(--shadow-glow), var(--shadow); }
+    .card-top { background: linear-gradient(145deg, #080e1a, #121c2e); min-height: 150px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .card-top img { width: 100%; height: 150px; object-fit: cover; transition: transform 0.45s; }
+    .weapon-card:hover .card-top img { transform: scale(1.07); }
+    .card-no-photo { font-size: 52px; filter: drop-shadow(0 0 16px rgba(0,229,212,0.4)); }
+    .card-cat { position: absolute; top: 10px; right: 10px; background: rgba(3,5,10,0.7); backdrop-filter: blur(8px); color: var(--teal); font-size: 9px; padding: 3px 10px; font-family: 'Share Tech Mono', monospace; border: 1px solid var(--border2); border-radius: 999px; }
+    .card-body { padding: 16px; }
+    .card-name { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.02em; margin-bottom: 5px; }
+    .card-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+    .card-price { font-family: 'Share Tech Mono', monospace; font-size: 15px; font-weight: 700; color: var(--teal); margin-bottom: 12px; }
+    .add-btn {
+      width: 100%; padding: 11px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+      border: 1px solid var(--border2); background: rgba(0,229,212,0.07); color: var(--teal); cursor: pointer;
+      letter-spacing: 0.06em; transition: all 0.2s; border-radius: var(--radius-sm);
+    }
+    .add-btn:hover { background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f; box-shadow: 0 6px 20px rgba(0,229,212,0.35); }
+
+    /* MODAL ARME */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(2,4,8,0.8); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(10px); animation: fadein 0.2s ease; }
+    .modal-box { background: rgba(10,15,26,0.92); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: var(--shadow); }
+    .modal-close { position: absolute; top: 14px; right: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--muted); cursor: pointer; font-size: 16px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s; }
+    .modal-close:hover { color: #fff; background: var(--red); border-color: var(--red); }
+    .gallery { position: relative; background: #000; min-height: 260px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 20px 20px 0 0; }
+    .gallery img { width: 100%; max-height: 320px; object-fit: cover; transition: opacity 0.3s; }
+    .gallery-no-photo { font-size: 80px; filter: drop-shadow(0 0 24px rgba(0,229,212,0.45)); }
+    .gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); color: #fff; cursor: pointer; font-size: 20px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .gallery-nav:hover { background: rgba(0,229,212,0.3); }
+    .gallery-nav.prev { left: 12px; } .gallery-nav.next { right: 12px; }
+    .gallery-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+    .gdot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.2s; }
+    .gdot.active { background: var(--teal); width: 22px; border-radius: 5px; }
+    .modal-body { padding: 24px; }
+    .modal-name { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 800; color: #fff; letter-spacing: 0.02em; }
+    .modal-cat-badge { display: inline-block; font-size: 10px; padding: 3px 12px; background: rgba(0,229,212,0.1); border: 1px solid var(--border2); color: var(--teal); font-family: 'Share Tech Mono', monospace; margin: 8px 0 14px; border-radius: 999px; }
+    .modal-desc { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+    .modal-price-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .modal-price { font-family: 'Share Tech Mono', monospace; font-size: 22px; color: var(--teal); font-weight: 800; }
+    .modal-add-btn { padding: 12px 28px; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f; border: none; cursor: pointer; letter-spacing: 0.06em; border-radius: 999px; transition: all 0.2s; box-shadow: 0 6px 22px rgba(0,229,212,0.35); }
+    .modal-add-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,229,212,0.45); }
+
+    /* ============ ORDER ============ */
+    .order-wrap { padding: 28px 24px; max-width: 720px; }
+    .section-title { font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 800; color: #fff; letter-spacing: 0.02em; margin-bottom: 5px; }
+    .section-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; font-family: 'Share Tech Mono', monospace; }
+    .order-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); margin-bottom: 10px; transition: border-color 0.2s; }
+    .order-item:hover { border-color: rgba(0,229,212,0.22); }
+    .item-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: #0a0e18; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; overflow: hidden; }
+    .item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .item-info { flex: 1; }
+    .item-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; }
+    .item-unit { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+    .qty-wrap { display: flex; align-items: center; gap: 8px; }
+    .qty-btn { width: 30px; height: 30px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--teal); font-size: 16px; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .qty-btn:hover { background: rgba(0,229,212,0.15); border-color: var(--border2); }
+    .qty-num { font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700; min-width: 22px; text-align: center; }
+    .item-total { font-family: 'Share Tech Mono', monospace; font-size: 14px; font-weight: 700; color: var(--teal); min-width: 110px; text-align: right; }
+    .del-btn { background: transparent; border: none; cursor: pointer; color: var(--muted); font-size: 18px; transition: color 0.15s; }
+    .del-btn:hover { color: var(--red); }
+
+    /* PROMO */
+    .promo-box { display: flex; gap: 8px; margin-bottom: 12px; }
+    .promo-input { flex: 1; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-size: 13px; font-family: 'Share Tech Mono', monospace; outline: none; border-radius: var(--radius-sm); }
+    .promo-input:focus { border-color: var(--teal); background: rgba(0,229,212,0.04); }
+    .promo-input::placeholder { color: var(--muted); }
+    .promo-btn { padding: 12px 20px; background: rgba(0,229,212,0.08); border: 1px solid var(--border2); color: var(--teal); font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s; }
+    .promo-btn:hover { background: rgba(0,229,212,0.16); }
+    .promo-ok { font-size: 12px; color: var(--green); margin-bottom: 8px; }
+    .promo-err { font-size: 12px; color: var(--red); margin-bottom: 8px; }
+
+    .total-bar { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: linear-gradient(135deg, rgba(0,229,212,0.12), rgba(0,184,169,0.04)); border: 1px solid var(--border2); border-radius: var(--radius); margin-bottom: 22px; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+    .total-amount { font-family: 'Share Tech Mono', monospace; font-size: 20px; font-weight: 800; color: var(--teal); }
+    .total-original { font-size: 12px; color: var(--muted); text-decoration: line-through; font-family: 'Share Tech Mono', monospace; }
+
+    .form-box { background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 22px; margin-bottom: 16px; box-shadow: var(--shadow); }
+    .form-box-title { font-family: 'Rajdhani', sans-serif; font-size: 11.5px; font-weight: 700; color: var(--teal); letter-spacing: 0.14em; margin-bottom: 16px; text-transform: uppercase; }
+    .discord-info-box { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: rgba(88,101,242,0.1); border: 1px solid rgba(88,101,242,0.28); border-radius: var(--radius-sm); margin-bottom: 16px; }
+    .discord-info-box img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #5865F2; }
+    .discord-info-text { font-size: 13px; font-weight: 600; color: #8ea1ff; font-family: 'Rajdhani', sans-serif; }
+    .discord-info-sub { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field label { font-size: 10.5px; color: var(--muted); display: block; margin-bottom: 6px; font-family: 'Share Tech Mono', monospace; letter-spacing: 0.08em; }
+    .field .req { color: var(--red); }
+    .field input, .field textarea { width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-size: 13px; outline: none; font-family: 'Barlow', sans-serif; border-radius: var(--radius-sm); transition: border-color 0.2s, background 0.2s; }
+    .field input:focus, .field textarea:focus { border-color: var(--teal); background: rgba(0,229,212,0.04); }
+    .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+    .field.full { grid-column: 1 / -1; }
+    .field textarea { resize: none; height: 80px; }
+    .signature-box { margin-top: 16px; padding: 16px; background: rgba(0,229,212,0.03); border: 1px solid rgba(0,229,212,0.14); border-radius: var(--radius-sm); }
+    .signature-title { font-family: 'Rajdhani', sans-serif; font-size: 11.5px; font-weight: 700; color: var(--teal); margin-bottom: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .signature-area { width: 100%; height: 100px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); display: block; cursor: crosshair; border-radius: 10px; }
+    .signature-clear { margin-top: 8px; font-size: 11px; color: var(--muted); cursor: pointer; text-decoration: underline; background: none; border: none; font-family: 'Share Tech Mono', monospace; }
+    .cgu-wrap { display: flex; align-items: flex-start; gap: 10px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); margin-top: 14px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+    .cgu-wrap input { accent-color: var(--teal); margin-top: 2px; flex-shrink: 0; }
+    .submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 800; border: none; cursor: pointer; letter-spacing: 0.08em; transition: all 0.2s; margin-top: 16px; border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,229,212,0.35); }
+    .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(0,229,212,0.45); }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    .login-required { text-align: center; padding: 70px 24px; }
+    .login-required-icon { font-size: 52px; margin-bottom: 14px; }
+    .login-required-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    .login-required-sub { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+    .discord-login-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: #5865F2; color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; border: none; cursor: pointer; border-radius: 999px; transition: all 0.2s; box-shadow: 0 8px 24px rgba(88,101,242,0.4); }
+    .discord-login-btn:hover { transform: translateY(-2px); }
+    .empty-cart { text-align: center; padding: 52px; color: var(--muted); font-size: 14px; }
+
+    /* SUCCESS */
+    .success-wrap { padding: 48px 24px; max-width: 540px; margin: 0 auto; text-align: center; }
+    .success-icon { font-size: 56px; margin-bottom: 14px; }
+    .success-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 8px; letter-spacing: 0.02em; }
+    .success-msg { font-size: 13.5px; color: var(--muted); margin-bottom: 26px; line-height: 1.7; }
+    .success-box { background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 20px; text-align: left; margin-bottom: 22px; box-shadow: var(--shadow); }
+    .success-box-title { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--teal); letter-spacing: 0.2em; margin-bottom: 14px; }
+    .success-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    .success-row:last-child { border-bottom: none; }
+    .success-label { color: var(--muted); }
+    .success-total { color: var(--teal); font-weight: 800; font-family: 'Share Tech Mono', monospace; font-size: 16px; }
+
+    /* ============ ADMIN ============ */
+    .admin-wrap { padding: 28px 24px; }
+    .admin-header { margin-bottom: 22px; }
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
+    .stat-card { background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 18px; text-align: center; transition: transform 0.2s, border-color 0.2s; box-shadow: var(--shadow); }
+    .stat-card:hover { transform: translateY(-3px); border-color: var(--border2); }
+    .stat-val { font-family: 'Share Tech Mono', monospace; font-size: 24px; color: var(--teal); font-weight: 800; }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.05em; text-transform: uppercase; }
+    .admin-tabs { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+    .tab-btn { font-family: 'Rajdhani', sans-serif; font-size: 12.5px; font-weight: 700; padding: 9px 18px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--muted); cursor: pointer; letter-spacing: 0.06em; text-transform: uppercase; transition: all 0.2s; border-radius: 999px; }
+    .tab-btn.active { background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f; border-color: transparent; box-shadow: 0 6px 18px rgba(0,229,212,0.3); }
+    .add-form { background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow); }
+    .add-form-title { font-family: 'Rajdhani', sans-serif; font-size: 11.5px; font-weight: 700; color: var(--teal); letter-spacing: 0.14em; margin-bottom: 16px; text-transform: uppercase; }
+    .add-form .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .add-form input, .add-form select, .add-form textarea { width: 100%; padding: 11px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-size: 13px; outline: none; font-family: 'Barlow', sans-serif; border-radius: var(--radius-sm); }
+    .add-form input:focus, .add-form select:focus { border-color: var(--teal); }
+    .add-form textarea { resize: vertical; min-height: 56px; font-family: 'Barlow', sans-serif; }
+    .add-form select option { background: #0d1220; }
+    .btn-confirm { margin-top: 14px; padding: 11px 22px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; background: linear-gradient(135deg, var(--teal), var(--teal2)); color: #03120f; border: none; cursor: pointer; letter-spacing: 0.06em; border-radius: 999px; transition: all 0.2s; box-shadow: 0 6px 18px rgba(0,229,212,0.28); }
+    .btn-confirm:hover { transform: translateY(-2px); }
+
+    /* Admin list rows */
+    .admin-weapon-row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); margin-bottom: 10px; transition: border-color 0.2s; }
+    .admin-weapon-row:hover { border-color: rgba(0,229,212,0.18); }
+    .aw-thumb { width: 44px; height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: #0a0e18; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .aw-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .aw-info { flex: 1; }
+    .aw-name { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; }
+    .aw-meta { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+    .aw-price { font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700; color: var(--teal); }
+    .aw-del { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3); color: var(--red); padding: 6px 14px; font-size: 11px; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 700; border-radius: 999px; transition: all 0.2s; }
+    .aw-del:hover { background: rgba(248,113,113,0.18); }
+
+    /* Photos upload admin */
+    .photos-upload-area { margin-top: 12px; border: 1px dashed rgba(0,229,212,0.3); padding: 14px; background: rgba(0,229,212,0.02); border-radius: var
+        .photos-upload-area { margin-top: 12px; border: 1px dashed rgba(0,229,212,0.3); padding: 14px; background: rgba(0,229,212,0.02); border-radius: var(--radius-sm); }
+    .photos-upload-area label { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; display: block; margin-bottom: 8px; }
+    .photos-upload-area input[type=file] { font-size: 12px; color: var(--muted); cursor: pointer; }
+    .photos-preview { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .photos-preview img { width: 56px; height: 56px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; }
+    .photo-del-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #fff; border: none; font-size: 10px; cursor: pointer; padding: 1px 5px; border-radius: 6px; }
+    .photo-wrap { position: relative; }
+
+    /* Order cards admin */
+    .order-card { background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; transition: border-color 0.2s, transform 0.2s; box-shadow: var(--shadow); }
+    .order-card:hover { border-color: rgba(0,229,212,0.25); transform: translateY(-2px); }
+    .oca-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+    .oca-left { display: flex; align-items: center; gap: 10px; }
+    .oca-avatar { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--teal); }
+    .oca-pseudo { font-family: 'Rajdhani', sans-serif; font-size: 15.5px; font-weight: 700; }
+    .oca-discord { font-size: 12px; color: #8ea1ff; font-family: 'Share Tech Mono', monospace; }
+    .oca-gang { font-size: 12px; color: var(--muted); }
+    .status-badge { font-family: 'Rajdhani', sans-serif; font-size: 10px; padding: 4px 12px; font-weight: 700; letter-spacing: 0.1em; border-radius: 999px; }
+    .badge-pending { background: rgba(251,191,36,0.12); color: var(--amber); border: 1px solid rgba(251,191,36,0.3); }
+    .badge-done { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+    .oca-items { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .oca-total { font-family: 'Share Tech Mono', monospace; font-size: 16px; font-weight: 800; color: var(--teal); margin-bottom: 12px; }
+    .oca-date { font-size: 10px; color: var(--muted); font-family: 'Share Tech Mono', monospace; margin-bottom: 10px; }
+    .oca-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-terminate { padding: 8px 16px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, var(--green), #10b981); color: #03120f; border: none; cursor: pointer; border-radius: 999px; transition: all 0.2s; }
+    .btn-terminate:hover { transform: translateY(-1px); }
+    .btn-terminate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-delete { padding: 8px 16px; font-family: 'Rajdhani', sans-serif; font-size: 12px; background: rgba(248,113,113,0.08); color: var(--red); border: 1px solid rgba(248,113,113,0.3); cursor: pointer; font-weight: 700; border-radius: 999px; transition: all 0.2s; }
+    .btn-delete:hover { background: rgba(248,113,113,0.18); }
+    .orders-filter { display: flex; gap: 8px; margin-bottom: 16px; }
+    .filter-btn { font-size: 11.5px; padding: 6px 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--muted); cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 700; transition: all 0.2s; border-radius: 999px; }
+    .filter-btn:hover, .filter-btn.active { color: var(--teal); border-color: var(--border2); background: rgba(0,229,212,0.1); }
+
+    /* Promo admin */
+    .promo-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--card); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); margin-bottom: 10px; }
+    .promo-code { font-family: 'Share Tech Mono', monospace; font-size: 14px; font-weight: 700; color: var(--amber); }
+    .promo-info { flex: 1; font-size: 12px; color: var(--muted); }
+
+    /* DENIED / ACCESS */
+    .denied-wrap { text-align: center; padding: 90px 24px; }
+    .denied-icon { font-size: 54px; margin-bottom: 14px; }
+    .denied-title { font-family: 'Rajdhani', sans-serif; font-size: 23px; font-weight: 800; color: var(--red); margin-bottom: 8px; letter-spacing: 0.02em; }
+    .denied-sub { font-size: 13px; color: var(--muted); }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,229,212,0.25); border-radius: 3px; }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .admin-stats { grid-template-columns: 1fr 1fr; }
+      .topbar { padding: 0 12px; height: 58px; }
+      .nav-btn { padding: 7px 12px; font-size: 11px; }
+      .shop-title { font-size: 26px; }
+      .order-wrap, .admin-wrap { padding: 18px 14px; }
+    }
+
+    /* ============ PARAMÈTRES PERSONNELS ============ */
+    body[data-corners="sharp"] .nav-btn,
+    body[data-corners="sharp"] .cat-btn,
+    body[data-corners="sharp"] .add-btn,
+    body[data-corners="sharp"] .submit-btn,
+    body[data-corners="sharp"] .btn-confirm,
+    body[data-corners="sharp"] .modal-add-btn,
+    body[data-corners="sharp"] .filter-btn,
+    body[data-corners="sharp"] .promo-btn,
+    body[data-corners="sharp"] .tab-btn,
+    body[data-corners="sharp"] .discord-login-btn,
+    body[data-corners="sharp"] .aw-del,
+    body[data-corners="sharp"] .btn-delete,
+    body[data-corners="sharp"] .btn-terminate,
+    body[data-corners="sharp"] .logo-badge {
+      border-radius: 0 !important;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%) !important;
+    }
+    body[data-corners="sharp"] .weapon-card,
+    body[data-corners="sharp"] .modal-box,
+    body[data-corners="sharp"] .order-item,
+    body[data-corners="sharp"] .form-box,
+    body[data-corners="sharp"] .add-form,
+    body[data-corners="sharp"] .stat-card,
+    body[data-corners="sharp"] .order-card,
+    body[data-corners="sharp"] .admin-weapon-row,
+    body[data-corners="sharp"] .promo-row,
+    body[data-corners="sharp"] .success-box,
+    body[data-corners="sharp"] .card-top,
+    body[data-corners="sharp"] .gallery,
+    body[data-corners="sharp"] .item-thumb,
+    body[data-corners="sharp"] .aw-thumb {
+      border-radius: 0 !important;
+    }
+
+    body[data-motion="reduced"] *,
+    body[data-motion="reduced"] *::before,
+    body[data-motion="reduced"] *::after {
+      animation-duration: 0.001s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0.001s !important;
+    }
+
+    body[data-density="compact"] .catalog { gap: 10px; padding: 14px; }
+    body[data-density="compact"] .card-body { padding: 10px; }
+    body[data-density="compact"] .order-item { padding: 8px 10px; margin-bottom: 6px; }
+    body[data-density="compact"] .admin-weapon-row { padding: 8px 10px; margin-bottom: 6px; }
+    body[data-density="compact"] .order-card { padding: 12px; margin-bottom: 8px; }
+    body[data-density="compact"] .promo-row { padding: 8px 10px; margin-bottom: 6px; }
+    body[data-density="compact"] .form-box { padding: 14px; }
+    body[data-density="compact"] .add-form { padding: 12px; }
+    body[data-density="compact"] .stat-card { padding: 10px; }
+    body[data-density="compact"] .admin-wrap,
+    body[data-density="compact"] .order-wrap { padding: 16px; }
+
+    body[data-bganim="off"]::after { display: none; }
+
+    .nav-btn.active,
+    .add-btn:hover,
+    .submit-btn:hover,
+    .modal-add-btn:hover,
+    .btn-confirm:hover,
+    .btn-terminate:hover {
+      box-shadow: 0 8px 26px rgba(var(--teal-rgb, 0,229,212), var(--glow-alpha, 0.3)) !important;
+    }
+
+    @media (max-width: 640px) {
+      body[data-cardsize] .catalog {
+        grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-min-width, 150px) * 0.7), 1fr));
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="bg-slideshow" id="bg-slideshow"></div>
+<div class="bg-overlay"></div>
+
+
+<div class="topbar">
+  <button class="hamburger-btn" onclick="toggleDrawer()">☰</button>
+  <div class="logo-wrap" onclick="showPage('shop')">
+    <div class="logo-badge">FH</div>
+    <div class="logo-sub">Black Market · RP</div>
+  </div>
+  <div style="width:36px"></div>
+</div>
+
+<div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer()"></div>
+<div class="sidebar-drawer" id="sidebar-drawer">
+  <div class="drawer-header">
+    <div class="logo-badge">FH</div>
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;letter-spacing:0.05em">UNDERGROUND</div>
+      <div class="logo-sub">Black Market · RP</div>
+    </div>
+  </div>
+  <nav class="drawer-nav">
+    <button class="drawer-item active" onclick="showPage('shop')">📦 <span>Catalogue</span></button>
+    <button class="drawer-item" onclick="showPage('order')">🛒 <span>Commande</span> <span id="cart-badge" class="cart-badge" style="display:none">0</span></button>
+    <button class="drawer-item" id="nav-absence" onclick="showPage('absence')" style="display:none">🗓️ <span>Absence</span></button>
+    <button class="drawer-item" id="nav-presence" onclick="showPage('presence')" style="display:none">📋 <span>Présence</span></button>
+    <button class="drawer-item" id="nav-roles" onclick="showPage('roles')">🎭 <span>Rôles</span></button>
+    <button class="drawer-item" id="nav-admin" onclick="goAdmin()">🛡️ <span>Admin</span></button>
+    <button class="drawer-item" id="nav-settings" onclick="showPage('settings')" style="display:none">⚙️ <span>Paramètres</span></button>
+  </nav>
+  <div class="drawer-footer" id="auth-area"></div>
+</div>
+
+<!-- SHOP -->
+<div id="page-shop" class="page active">
+  <div class="shop-header">
+    <div class="shop-title">Famille Hoffman</div>
+    <div class="shop-sub">// Paiement argent sale · Livraison en jeu · Organisation Famille Hoffman</div>
+    <div class="cat-filters" id="cat-filters"></div>
+  </div>
+  <div class="catalog" id="catalog"></div>
+</div>
+
+<!-- ORDER -->
+<div id="page-order" class="page">
+  <div class="order-wrap" id="order-content"></div>
+  <div class="order-wrap" id="my-history-wrap" style="padding-top:0"></div>
+</div>
+
+<!-- SUCCESS -->
+<div id="page-success" class="page">
+  <div class="success-wrap">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Commande envoyée !</div>
+    <div class="success-msg">Votre commande a été transmise au staff Famille Hoffman sur Discord. Vous serez contacté <strong>en jeu</strong> dès qu'elle sera prête. Un message privé Discord vous sera envoyé automatiquement.</div>
+    <div class="success-box">
+      <div class="success-box-title">// RÉCAPITULATIF COMMANDE</div>
+      <div id="success-content"></div>
+    </div>
+    <button class="submit-btn" onclick="showPage('shop')">↩ Retour au catalogue</button>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="page-admin" class="page">
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <div class="section-title">Panel Admin · Famille Hoffman</div>
+      <div class="section-sub">// Gestion complète du catalogue et des commandes</div>
+    </div>
+    <div class="admin-stats" id="admin-stats"></div>
+        <div class="add-form" id="maintenance-box" style="display:none">
+      <div class="add-form-title">🔧 Mode maintenance</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Quand activé, seuls les admins peuvent voir le site normalement — tout le monde voit un message.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="cat-btn" id="maint-off-btn" onclick="setMaintenance(false)">Désactivé</button>
+        <button class="cat-btn" id="maint-on-btn" onclick="setMaintenance(true)">Activé</button>
+      </div>
+      <input type="text" id="maintenance-msg-input" placeholder="Message affiché aux joueurs" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid rgba(0,212,200,0.2);color:var(--text);font-size:13px;outline:none;border-radius:8px">
+    </div>
+    <div id="danger-zone" style="display:none;background:rgba(211,58,58,0.06);border:1px solid rgba(211,58,58,0.35);border-radius:12px;padding:18px;margin-bottom:22px">
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:#f87171;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">⚠ Zone dangereuse — réservée au propriétaire</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Supprime tous les messages du bot dans tous les salons Discord + vide l'historique des commandes. Irréversible.</div>
+      <button class="btn-delete" onclick="triggerFullReset()">🗑️ Réinitialisation complète</button>
+      <div style="height:12px"></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Supprime TOUS les salons et TOUS les rôles Discord (sauf @everyone). Les membres restent sur le serveur, rien n'est touché de leur côté.</div>
+      <button class="btn-delete" onclick="triggerServerNuke()">💥 Reconstruire le serveur (salons + rôles)</button>
+    </div>
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchTab('orders')">📦 Commandes</button>
+      <button class="tab-btn" onclick="switchTab('weapons')">🔫 Armes</button>
+      <button class="tab-btn" onclick="switchTab('promos')">🏷️ Codes Promo</button>
+    </div>
+    <div id="tab-orders">
+      <div class="add-form" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="add-form-title" style="margin-bottom:0">📊 Évolution des ventes</div>
+          <div style="display:flex;gap:6px">
+            <button class="filter-btn active" data-chart-period="day" onclick="loadSalesChart('day',this)">Jour</button>
+            <button class="filter-btn" data-chart-period="week" onclick="loadSalesChart('week',this)">Semaine</button>
+            <button class="filter-btn" data-chart-period="month" onclick="loadSalesChart('month',this)">Mois</button>
+          </div>
+        </div>
+        <div id="sales-chart"></div>
+      </div>
+      <div class="add-form" style="margin-bottom:14px">
+        <div class="add-form-title">🔍 Rechercher un joueur par ID Discord</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="search-discord-id" placeholder="ID Discord (ex: 123456789012345678)" style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid rgba(212,175,55,0.2);color:var(--text);font-size:13px;outline:none">
+          <button class="btn-confirm" style="margin-top:0" onclick="searchByDiscordId()">Rechercher</button>
+          <button class="promo-btn" style="color:var(--muted)" onclick="clearSearch()">✕</button>
+        </div>
+        <div id="search-results" style="margin-top:12px"></div>
+      </div>
+      <div class="orders-filter">
+        <button class="filter-btn active" onclick="filterOrders('all',this)">Toutes</button>
+        <button class="filter-btn" onclick="filterOrders('pending',this)">En attente</button>
+        <button class="filter-btn" onclick="filterOrders('done',this)">Terminées</button>
+      </div>
+      <div id="admin-orders-list"></div>
+    </div>
+    <div id="tab-weapons" style="display:none">
+      <div class="add-form" id="add-weapon-form-box">
+        <div class="add-form-title">Ajouter une arme</div>
+        <div class="form-grid">
+          <div class="field"><label>Nom</label><input type="text" id="a-name" placeholder="Nom de l'arme"></div>
+          <div class="field"><label>Catégorie</label>
+            <select id="a-cat"></select>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <input type="text" id="new-cat-input" placeholder="Nouvelle catégorie..." style="flex:1;padding:6px 10px;background:var(--bg2);border:1px solid rgba(212,175,55,0.25);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+                <button onclick="addNewCat()" style="padding:6px 12px;background:var(--teal);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">+</button>
+              </div>
+              <div id="cat-manage-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+              <div style="margin-top:10px">
+                <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;letter-spacing:0.05em">Type de paiement</label>
+                <select id="a-currency" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid rgba(212,175,55,0.25);border-radius:6px;color:var(--text);font-size:13px;outline:none;">
+                  <option value="sale">💸 Argent sale</option>
+                  <option value="propre">💵 Argent propre</option>
+                </select>
+              </div>
+          </div>
+          <div class="field"><label>Prix (€)</label><input type="number" id="a-price" placeholder="1200000"></div>
+          <div class="field"><label>Description</label><input type="text" id="a-desc" placeholder="Description courte"></div>
+        </div>
+        <div class="photos-upload-area" style="margin-top:10px">
+          <label>Photos (plusieurs possibles — formats JPG, PNG, WEBP)</label>
+          <input type="file" id="a-photos" accept="image/*" multiple onchange="previewPhotos(this)">
+          <div class="photos-preview" id="a-photos-preview"></div>
+        </div>
+        <button class="btn-confirm" onclick="addWeapon()">+ Ajouter au catalogue</button>
+      </div>
+      <div id="admin-weapon-list"></div>
+    </div>
+    <div id="tab-promos" style="display:none">
+      <div class="add-form" id="add-promo-form-box">
+        <div class="add-form-title">Créer un code promo</div>
+        <div class="form-grid">
+          <div class="field"><label>Code</label><input type="text" id="p-code" placeholder="LEGIONVIP" style="text-transform:uppercase"></div>
+          <div class="field"><label>Réduction (%)</label><input type="number" id="p-discount" placeholder="10" min="1" max="90"></div>
+          <div class="field"><label>Expiration (optionnel)</label><input type="date" id="p-expires"></div>
+          <div class="field"><label>Nb utilisations max (optionnel)</label><input type="number" id="p-maxuses" placeholder="Illimité" min="1"></div>
+        </div>
+        <button class="btn-confirm" onclick="addPromo()">Créer le code</button>
+      </div>
+      <div id="admin-promos-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ROLES -->
+<div id="page-roles" class="page">
+  <div class="order-wrap" style="max-width:820px">
+    <div class="section-title">Rôles & Permissions</div>
+    <div class="section-sub">// Synchronisé en direct depuis le serveur Discord</div>
+    <div id="roles-list"></div>
+  </div>
+</div>
+
+<!-- ABSENCE -->
+<div id="page-absence" class="page">
+  <div class="order-wrap" style="max-width:900px">
+    <div class="section-title">Déclarer une absence</div>
+    <div class="section-sub">// Renseigne tes infos, ça sera posté/mis à jour automatiquement sur Discord</div>
+    <div class="form-box">
+      <div class="form-box-title">Informations</div>
+      <div class="form-grid">
+        <div class="field full"><label>Nom / prénom illégal (RP) <span class="req">*</span></label><input type="text" id="abs-rpname" placeholder="Tony Montana"></div>
+        <div class="field"><label>Absent à partir de <span class="req">*</span></label><input type="datetime-local" id="abs-from"></div>
+        <div class="field"><label>Jusqu'à <span class="req">*</span></label><input type="datetime-local" id="abs-to"></div>
+      </div>
+      <div class="cgu-wrap">
+        <input type="checkbox" id="abs-cgu">
+        <label for="abs-cgu">Je confirme l'exactitude de ces informations et je m'engage à prévenir en cas de changement.</label>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="submitAbsence()" id="abs-submit-btn">📋 Envoyer mon absence</button>
+    <div id="abs-mine" style="margin-top:20px"></div>
+
+    <div class="form-box" style="margin-top:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <button class="qty-btn" onclick="calChangeMonth(-1)">‹</button>
+        <div id="cal-month-label" style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--teal)"></div>
+        <button class="qty-btn" onclick="calChangeMonth(1)">›</button>
+      </div>
+      <div id="cal-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="page-settings" class="page">
+  <div class="order-wrap">
+    <div class="section-title">Paramètres personnels</div>
+    <div class="section-sub">// Visible uniquement par toi, sauvegardé sur ton compte, appliqué partout (site + panel admin)</div>
+
+    <div class="form-box">
+      <div class="form-box-title">Couleur d'accent</div>
+      <div id="color-swatches" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:11px;color:var(--muted)">Personnalisée :</label>
+        <input type="color" id="custom-color-input" value="#00d4c8" onchange="setSetting('accentColor', this.value)" style="width:44px;height:32px;border:none;background:none;cursor:pointer">
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Taille du texte</div>
+      <div data-setting-group="fontSize" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="small" onclick="setSetting('fontSize','small')">Petit</button>
+        <button class="cat-btn" data-value="normal" onclick="setSetting('fontSize','normal')">Normal</button>
+        <button class="cat-btn" data-value="large" onclick="setSetting('fontSize','large')">Grand</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Style des coins</div>
+      <div data-setting-group="corners" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="rounded" onclick="setSetting('corners','rounded')">Arrondis</button>
+        <button class="cat-btn" data-value="sharp" onclick="setSetting('corners','sharp')">Angulaires</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Intensité du flou verre</div>
+      <div data-setting-group="glass" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="light" onclick="setSetting('glass','light')">Léger</button>
+        <button class="cat-btn" data-value="normal" onclick="setSetting('glass','normal')">Normal</button>
+        <button class="cat-btn" data-value="heavy" onclick="setSetting('glass','heavy')">Prononcé</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Animations</div>
+      <div data-setting-group="motion" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="normal" onclick="setSetting('motion','normal')">Normales</button>
+        <button class="cat-btn" data-value="reduced" onclick="setSetting('motion','reduced')">Réduites</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Densité d'affichage</div>
+      <div data-setting-group="density" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="comfortable" onclick="setSetting('density','comfortable')">Confortable</button>
+        <button class="cat-btn" data-value="compact" onclick="setSetting('density','compact')">Compacte</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Fond animé (grille néon)</div>
+      <div data-setting-group="bgAnim" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="on" onclick="setSetting('bgAnim','on')">Activé</button>
+        <button class="cat-btn" data-value="off" onclick="setSetting('bgAnim','off')">Désactivé</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Taille des cartes du catalogue</div>
+      <div data-setting-group="cardSize" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="small" onclick="setSetting('cardSize','small')">Petites</button>
+        <button class="cat-btn" data-value="medium" onclick="setSetting('cardSize','medium')">Moyennes</button>
+        <button class="cat-btn" data-value="large" onclick="setSetting('cardSize','large')">Grandes</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Tri par défaut du catalogue</div>
+      <div data-setting-group="sort" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="cat-btn" data-value="default" onclick="setSetting('sort','default')">Par défaut</button>
+        <button class="cat-btn" data-value="price-asc" onclick="setSetting('price-asc')">Prix croissant</button>
+        <button class="cat-btn" data-value="price-desc" onclick="setSetting('sort','price-desc')">Prix décroissant</button>
+        <button class="cat-btn" data-value="alpha" onclick="setSetting('sort','alpha')">Alphabétique</button>
+      </div>
+    </div>
+
+    <div class="form-box">
+      <div class="form-box-title">Effet de lueur sur les boutons</div>
+      <div data-setting-group="glow" style="display:flex;gap:8px">
+        <button class="cat-btn" data-value="off" onclick="setSetting('glow','off')">Aucun</button>
+        <button class="cat-btn" data-value="normal" onclick="setSetting('glow','normal')">Normal</button>
+        <button class="cat-btn" data-value="strong" onclick="setSetting('glow','strong')">Prononcé</button>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="resetSettings()">↩ Réinitialiser aux valeurs par défaut</button>
+  </div>
+</div>
+
+<!-- MAINTENANCE -->
+<div id="page-maintenance" class="page">
+  <div class="denied-wrap">
+    <div class="denied-icon">🔧</div>
+    <div class="denied-title" style="color:var(--teal)">Site en maintenance</div>
+    <div class="denied-sub" id="maintenance-message"></div>
+  </div>
+</div>
+
+<!-- PRESENCE -->
+<div id="page-presence" class="page">
+  <div class="order-wrap">
+    <div class="section-title">Créer un appel de présence</div>
+    <div class="section-sub">// Le bot poste un message avec 3 réactions (✅ présent, ⏳ en retard, ❌ absent). Utilise les boutons ci-dessous pour rappeler ceux qui n'ont pas réagi.</div>
+    <div class="form-box">
+      <div class="form-box-title">Détails de l'appel</div>
+      <div class="form-grid">
+        <div class="field full"><label>Raison <span class="req">*</span></label><input type="text" id="pres-reason" placeholder="Session RP ce soir, réunion staff..."></div>
+        <div class="field"><label>Heure de l'événement <span class="req">*</span></label><input type="datetime-local" id="pres-time"></div>
+        <div class="field"><label>Rôle concerné <span class="req">*</span></label><select id="pres-role"><option value="">Chargement...</option></select></div>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="submitPresence()" id="pres-submit-btn">📋 Lancer l'appel</button>
+
+    <div class="section-title" style="font-size:18px;margin-top:28px">Appels précédents</div>
+    <div id="presence-history" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- DENIED -->
+<div id="page-denied" class="page">
+  <div class="denied-wrap">
+    <div class="denied-icon">🚫</div>
+    <div class="denied-title">Accès refusé</div>
+    <div class="denied-sub">Vous n'êtes pas autorisé à accéder au panel admin Famille Hoffman.</div>
+  </div>
+</div>
+
+<!-- MODAL ARME -->
+<div id="weapon-modal" style="display:none" class="modal-overlay" onclick="closeModalOverlay(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="gallery" id="modal-gallery"></div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+  // COLLE ICI TOUT LE JAVASCRIPT QUE TU M’AS ENVOYÉ (à partir de "let weapons = [];" jusqu’à la fin)
+  // Il n’a PAS été modifié.
+</script>
+</body>
+</html>
